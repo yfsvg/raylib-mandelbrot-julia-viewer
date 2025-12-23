@@ -41,7 +41,7 @@ bool wasMovingLastFrame = false;
 
 long double zoomFactor = 250;
 long double oldZoomFactor = zoomFactor;
-int detailAmt = 200;
+int detailAmt = 250;
 
 bool toggledMoreInfo = true;
 
@@ -104,11 +104,13 @@ bool isInMandelbrot(std::complex<long double> c) {
     return true; 
 }
 
+// Exact same code as above, HOWEVER, it returns the amount of iterations needed to escape.
+// If it doesn't escape with the given detailAmt, then it's marked as -1
 int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
     std::complex<long double> z(0.0L, 0.0L);
     std::complex<long double> z_old(0.0L, 0.0L);
     int period = 0;
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < detailAmt; i++)
     {
         z = z * z + c;
         if (std::abs(z) > 2.0L)
@@ -130,6 +132,9 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
     
 }
 
+std::vector<int> allEscapeValues;
+std::vector<Color> relativeEscapeValueColors;
+
 // Changed the implementation of the way that the texture is shown, instead of calculating everything
 // Only redraw the texture after each change in perspective
 void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, long double offsetY) {
@@ -143,23 +148,54 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     long double centerReal = offsetX / zoomFactor;
     long double centerImag = offsetY / zoomFactor;
 
+    allEscapeValues.clear();
+    relativeEscapeValueColors.clear();
     for (int x = setWidth * -0.5; x <= setWidth * 0.5; x++) {
         for (int y = setHeight * -0.5; y <= setHeight * 0.5; y++) {
             long double real = centerReal + x / zoomFactor;
             long double imag = centerImag + y / zoomFactor;
 
-            if (isInMandelbrot(std::complex<long double>(real, imag))) {
-                DrawRectangle(setWidth / 2 + x, setHeight / 2 + y, 1, 1, RED);
-            }
+            allEscapeValues.push_back(isInMandlebrotButGiveIterationsToEscape(std::complex<long double>(real, imag)));
+        }
+    }
+
+    // Find min and max escape values because the coloring is relative
+    int minimumEscapeIterations = INT_MAX;
+    int maximumEscapeIterations = INT_MIN;
+    for (size_t i = 0; i < allEscapeValues.size(); i++) {
+        int val = allEscapeValues[i];
+        if (val != -1) {
+            minimumEscapeIterations = std::min(minimumEscapeIterations, val);
+            maximumEscapeIterations = std::max(maximumEscapeIterations, val);
+        }
+    }
+
+    // Coloring the colors based on escape values
+    for (size_t i = 0; i < allEscapeValues.size(); i++) {
+        int val = allEscapeValues[i];
+
+        if (val == -1) {
+            relativeEscapeValueColors.push_back(BLACK);
+        } else {
+            float t = (float)(val - minimumEscapeIterations) /
+                    (maximumEscapeIterations - minimumEscapeIterations);
+
+            relativeEscapeValueColors.push_back(
+                ColorFromHSV(t * 360.0f, 1.0f, 1.0f)
+            );
+        }
+    }
 
 
+    int idx = 0;
+    for (int x = setWidth * -0.5; x <= setWidth * 0.5; x++) {
+        for (int y = setHeight * -0.5; y <= setHeight * 0.5; y++) {
+            DrawRectangle(setWidth / 2 + x, setHeight / 2 + y, 1, 1, relativeEscapeValueColors[idx++]);
         }
     }
 
         // If the heat map is on, then use the isInMandlebrotButGiveIterationsToEscape function, not implemented yet but this is how i want to do it:
         // Go through each pixel, just like the nested for loops below
-
-        
 
     EndTextureMode();
 }
@@ -202,7 +238,6 @@ std::string truncateZeroes(long double input, int truncateAmount) {
     }
 
     return s_value;
-
 }
 
 int main(void) {
@@ -253,7 +288,7 @@ int main(void) {
         if (IsKeyPressed(KEY_I)) {
             toggledMoreInfo = !toggledMoreInfo;
         }
-        
+
         if (needsRedraw && !movingRightNow) {
             canMove = false;
             renderMandelbrotToTexture(mandelbrotTexture, offset.x, offset.y);
@@ -261,6 +296,7 @@ int main(void) {
             needsRedraw = false;
             canMove = true;
         }
+        
         
         // Store movement state for next frame
         wasMovingLastFrame = movingRightNow;
@@ -281,9 +317,13 @@ int main(void) {
         }
         
         if (toggledMoreInfo) {
+            Rectangle moreInfoBox = { 5, 5, 300, 150 };
+            DrawRectangleRounded(moreInfoBox, 0.1f, 16, BLACK);
+
             DrawFPS(10, 10);
             DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 10, 30, 20, DARKGRAY);
-            DrawText(TextFormat("X Pos: %s, Y Pos: %s", truncateZeroes(offset.x / zoomFactor, 15).c_str(), truncateZeroes(offset.y / zoomFactor, 15).c_str()), 10, 50, 20, DARKGRAY);
+            DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 15).c_str()), 10, 50, 20, DARKGRAY);
+            DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 15).c_str()), 10, 70, 20, DARKGRAY);
         }
 
         EndDrawing();
