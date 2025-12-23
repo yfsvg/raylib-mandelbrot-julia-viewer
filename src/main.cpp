@@ -13,25 +13,49 @@
 // Add a number line, mouse pointer coord display
 // Paramaterize z, make Julia set
 
+
+
+
 #include <math.h>
 #include <cstdlib>
 #include <complex>
 #include <vector>
+#include <algorithm>
+#include <string>
+#include <iomanip>
+#include <sstream>
 
 #include "raylib.h"
 #include "raymath.h"
 
-
-
+// What I use instead of Vector2! They only go up to floats which isn't super helpful...
 struct SuperVector2 {
     long double x;
     long double y;
 };
 
+// To make sure that you don't move as pixels are being found
 bool canMove = true;
-long double zoomFactor = 250;
+bool movingRightNow = false;
+bool wasMovingLastFrame = false;
 
-bool usingHeatMapOrNo = false;
+long double zoomFactor = 250;
+long double oldZoomFactor = zoomFactor;
+int detailAmt = 200;
+
+bool toggledMoreInfo = true;
+
+void drawNewZoomArea() {
+    long double scale = oldZoomFactor / zoomFactor;
+    Rectangle outline = {
+        .x = (float)((1 - scale) * 300),
+        .y = (float)((1 - scale) * 300),
+        .width = (float)(scale * 600),
+        .height = (float)(scale * 600)
+    };
+    
+    DrawRectangleLinesEx(outline, 5, BLUE);
+}
 
 void drawIntercepts(long double offsetX, long double offsetY) {
     DrawRectangle(GetScreenWidth() / 2 - 1 - (float)offsetX, 0, 2, GetScreenHeight(), RED);
@@ -64,24 +88,20 @@ bool isInMandelbrot(std::complex<long double> c) {
 
     std::complex<long double> z_old(0.0L, 0.0L);
     int period = 0;
-    for (int i = 0; i < 100; i++)
-    {
+    for (int i = 0; i < detailAmt; i++) {
         z = z * z + c;
-        if (std::abs(z) > 2.0L)
-        {
-            return false;
+        if (std::abs(z) > 2.0L) {
+            return false; 
         }
-        if (i == period)
-        {
-            if (std::abs(z - z_old) < 1e-10L)
-            {
+        if (i == period) {
+            if (std::abs(z - z_old) < 1e-10L) {
                 return true;
             }
             z_old = z;
             period = i;
         }
     }
-    return true;
+    return true; 
 }
 
 int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
@@ -106,6 +126,8 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
         }
     }
     return -1;
+
+    
 }
 
 // Changed the implementation of the way that the texture is shown, instead of calculating everything
@@ -121,122 +143,153 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     long double centerReal = offsetX / zoomFactor;
     long double centerImag = offsetY / zoomFactor;
 
-    if (usingHeatMapOrNo) {
+    for (int x = setWidth * -0.5; x <= setWidth * 0.5; x++) {
+        for (int y = setHeight * -0.5; y <= setHeight * 0.5; y++) {
+            long double real = centerReal + x / zoomFactor;
+            long double imag = centerImag + y / zoomFactor;
+
+            if (isInMandelbrot(std::complex<long double>(real, imag))) {
+                DrawRectangle(setWidth / 2 + x, setHeight / 2 + y, 1, 1, RED);
+            }
+
+
+        }
+    }
+
         // If the heat map is on, then use the isInMandlebrotButGiveIterationsToEscape function, not implemented yet but this is how i want to do it:
         // Go through each pixel, just like the nested for loops below
 
         
-    } else {
-
-        for (int x = setWidth * -0.5; x <= setWidth * 0.5; x++) {
-            for (int y = setHeight * -0.5; y <= setHeight * 0.5; y++) {
-                long double real = centerReal + x / zoomFactor;
-                long double imag = centerImag + y / zoomFactor;
-
-                if (isInMandelbrot(std::complex<long double>(real, imag))) {
-                    DrawRectangle(setWidth / 2 + x, setHeight / 2 + y, 1, 1, RED);
-                }
-
-
-            }
-        }
-
-    }
 
     EndTextureMode();
 }
 
-SuperVector2 offsetControls(long double offsetX, long double offsetY, RenderTexture2D mandelbrotTexture, SuperVector2 *renderOffset, bool *needsRedraw) {
+SuperVector2 offsetControls(long double offsetX, long double offsetY, RenderTexture2D mandelbrotTexture, SuperVector2 *renderOffset) {
     SuperVector2 returnVal = {offsetX, offsetY};
+    movingRightNow = false;
     if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
         returnVal.y = offsetY + 1.0L;
+        movingRightNow = true;
     }
     if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
         returnVal.y = offsetY - 1.0L;
+        movingRightNow = true;
     }
     if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
         returnVal.x = offsetX - 1.0L;
+        movingRightNow = true;
     }
     if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
         returnVal.x = offsetX + 1.0L;
+        movingRightNow = true;
     }
-
-    // Check if any movement key was released
-    if (IsKeyReleased(KEY_DOWN) || IsKeyReleased(KEY_S) ||
-        IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_W) ||
-        IsKeyReleased(KEY_LEFT) || IsKeyReleased(KEY_A) ||
-        IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_D))
-    {
-        *needsRedraw = true;
-    }
-
+    
     return returnVal;
+}
+
+// For easier displaying on the info side
+std::string truncateZeroes(long double input, int truncateAmount) {
+    std::stringstream ss;
+    // truncates
+    ss << std::setprecision(truncateAmount) << input;
+    std::string s_value = ss.str();
+
+    if (s_value.find('.') != std::string::npos) {
+        s_value.erase(s_value.find_last_not_of('0') + 1, std::string::npos);
+        if (s_value.back() == '.') {
+            s_value.pop_back();
+        }
+    }
+
+    return s_value;
+
 }
 
 int main(void) {
     SuperVector2 offset = {0, 0};
-    SuperVector2 renderOffset = {0, 0};
+    SuperVector2 renderOffset = {0, 0}; 
     InitWindow(600, 600, "Mandelbrot");
-
+    
     RenderTexture2D mandelbrotTexture = LoadRenderTexture(600, 600);
     bool needsRedraw = true;
 
     SetTargetFPS(120);
-
+    
     long double previousZoom = zoomFactor;
-
+    
     while (!WindowShouldClose()) {
         if (canMove) {
-            SuperVector2 newOffset = offsetControls(offset.x, offset.y, mandelbrotTexture, &renderOffset, &needsRedraw);
+            SuperVector2 newOffset = offsetControls(offset.x, offset.y, mandelbrotTexture, &renderOffset);
             offset = newOffset;
-
+            
             if (IsKeyDown(KEY_M)) {
                 zoomFactor += zoomFactor / 50.0L;
+                movingRightNow = true;
             }
             if (IsKeyDown(KEY_N)) {
                 zoomFactor -= zoomFactor / 50.0L;
+                movingRightNow = true;
             }
-            if (IsKeyReleased(KEY_M) || IsKeyReleased(KEY_N)) {
+
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_N)) {
+                oldZoomFactor = zoomFactor;
+            }
+            
+            // Check if movement/zoom just ended this frame
+            if (wasMovingLastFrame && !movingRightNow) {
+                // Apply zoom offset adjustment
                 if (fabsl(zoomFactor - previousZoom) > 0.01L) {
                     long double zoomRatio = zoomFactor / previousZoom;
                     offset.x = offset.x * zoomRatio;
                     offset.y = offset.y * zoomRatio;
-
-                    needsRedraw = true;
                     previousZoom = zoomFactor;
                 }
+                
+                oldZoomFactor = zoomFactor;
+                needsRedraw = true;
             }
         }
-
-        if (needsRedraw) {
+        
+        if (IsKeyPressed(KEY_I)) {
+            toggledMoreInfo = !toggledMoreInfo;
+        }
+        
+        if (needsRedraw && !movingRightNow) {
             canMove = false;
             renderMandelbrotToTexture(mandelbrotTexture, offset.x, offset.y);
             renderOffset = offset;
             needsRedraw = false;
             canMove = true;
         }
+        
+        // Store movement state for next frame
+        wasMovingLastFrame = movingRightNow;
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
-        Vector2 texturePos = { (float)(renderOffset.x - offset.x), (float)(renderOffset.y - offset.y) };
-        DrawTextureRec(mandelbrotTexture.texture,
-                        (Rectangle){0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height},
+
+        Vector2 texturePos = {
+            (float)(renderOffset.x - offset.x),
+            (float)(renderOffset.y - offset.y)
+        };
+        DrawTextureRec(mandelbrotTexture.texture, 
+                        (Rectangle){0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height}, 
                         texturePos, WHITE);
 
-        drawIntercepts(offset.x, offset.y);
-        DrawFPS(10, 10);
-        DrawText(TextFormat("Zoom: %.1Lf", zoomFactor), 10, 30, 20, DARKGRAY);
+        if (movingRightNow) {
+            drawNewZoomArea();
+        }
+        
+        if (toggledMoreInfo) {
+            DrawFPS(10, 10);
+            DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 10, 30, 20, DARKGRAY);
+            DrawText(TextFormat("X Pos: %s, Y Pos: %s", truncateZeroes(offset.x / zoomFactor, 15).c_str(), truncateZeroes(offset.y / zoomFactor, 15).c_str()), 10, 50, 20, DARKGRAY);
+        }
 
         EndDrawing();
     }
-
+    
     UnloadRenderTexture(mandelbrotTexture);
     CloseWindow();
     return 0;
 }
-
-// listening to kid cudi rightnow he's peak
-// My top 3 kanye (objectively correct):
-// 1. Ghost town
-// 2. Family Business
-// 3. Waves
