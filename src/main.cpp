@@ -6,10 +6,13 @@
 // Smart redrawing
 // Double -> long double
 // Local coordinates
+// Made shading work!
+// Better UI
 
 // Optimizations / features to make:
 // Loading screen so that you dont move during calculations
-// Shading
+// Even better UI with more checkboxes
+// FIX PERIODICTY CODE!!!!
 // Add a number line, mouse pointer coord display
 // Paramaterize z, make Julia set
 
@@ -23,6 +26,7 @@
 #include <algorithm>
 #include <string>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
 #include "raylib.h"
@@ -45,19 +49,19 @@ int detailAmt = 250;
 
 bool toggledMoreInfo = true;
 
-Color yefoiGrey = (Color){ 27, 27, 27 };
+bool editingDetail = false;
+char detailInputText[6] = "250";
 
-void drawNewZoomArea() {
-    long double scale = oldZoomFactor / zoomFactor;
-    Rectangle outline = {
-        .x = (float)((1 - scale) * 300),
-        .y = (float)((1 - scale) * 300),
-        .width = (float)(scale * 600),
-        .height = (float)(scale * 600)
-    };
-    
-    DrawRectangleLinesEx(outline, 5, BLUE);
-}
+bool editingZoomSpeed = false;
+char zoomSpeedInputText[6] = "50";
+long double zoomSpeed = 50;
+
+bool usingBoxZoom = false;
+/*
+Color yefoiGrey = (Color){ 27, 27, 27 };
+*/
+
+// rectangle zoom relocated to main
 
 void drawIntercepts(long double offsetX, long double offsetY) {
     DrawRectangle(GetScreenWidth() / 2 - 1 - (float)offsetX, 0, 2, GetScreenHeight(), RED);
@@ -86,7 +90,7 @@ bool isInMandelbrot(std::complex<long double> c) {
     if (std::abs(c.imag()) > 1.2L) {
         return false;
     }
-    // These early breaks might be helpful for bigger pictures
+    // These early breaks might be helpful for bigger pictures maybe by like a few percent lol
 
     std::complex<long double> z_old(0.0L, 0.0L);
     int period = 0;
@@ -179,8 +183,7 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
         if (val == -1) {
             relativeEscapeValueColors.push_back(BLACK);
         } else {
-            float t = (float)(val - minimumEscapeIterations) /
-                    (maximumEscapeIterations - minimumEscapeIterations);
+            float t = (float)(val - minimumEscapeIterations) / (maximumEscapeIterations - minimumEscapeIterations);
 
             relativeEscapeValueColors.push_back(
                 ColorFromHSV(t * 360.0f, 1.0f, 1.0f)
@@ -245,9 +248,10 @@ std::string truncateZeroes(long double input, int truncateAmount) {
 int main(void) {
     SuperVector2 offset = {0, 0};
     SuperVector2 renderOffset = {0, 0}; 
-    InitWindow(600, 600, "Mandelbrot");
+    InitWindow(900, 400, "Mandelbrot");
     
-    RenderTexture2D mandelbrotTexture = LoadRenderTexture(600, 600);
+    // miss mandie
+    RenderTexture2D mandelbrotTexture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     bool needsRedraw = true;
 
     SetTargetFPS(120);
@@ -260,11 +264,11 @@ int main(void) {
             offset = newOffset;
             
             if (IsKeyDown(KEY_M)) {
-                zoomFactor += zoomFactor / 50.0L;
+                zoomFactor += zoomFactor / zoomSpeed;
                 movingRightNow = true;
             }
             if (IsKeyDown(KEY_N)) {
-                zoomFactor -= zoomFactor / 50.0L;
+                zoomFactor -= zoomFactor / zoomSpeed;
                 movingRightNow = true;
             }
 
@@ -313,19 +317,104 @@ int main(void) {
         DrawTextureRec(mandelbrotTexture.texture, 
                         (Rectangle){0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height}, 
                         texturePos, WHITE);
-
         if (movingRightNow) {
-            drawNewZoomArea();
+            long double scale = oldZoomFactor / zoomFactor;
+            if (usingBoxZoom) {
+                Rectangle outline = {.x = (float)((1 - scale) * GetScreenWidth() / 2), .y = (float)((1 - scale) * GetScreenHeight() / 2), .width = (float)(scale * GetScreenWidth()), .height = (float)(scale * GetScreenHeight())};
+            } else {               
+                // shrunked down scaled texture
+                scale = 1 / scale;
+                Rectangle origMandie = {0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height};
+                Rectangle zoomChangeMandie = {
+                    (float)(GetScreenWidth() / 2 - (mandelbrotTexture.texture.width * scale) / 2 + texturePos.x * scale),
+                    (float)(GetScreenHeight() / 2 - (mandelbrotTexture.texture.height * scale) / 2 + texturePos.y * scale),
+                    (float)(mandelbrotTexture.texture.width * scale),
+                    (float)(mandelbrotTexture.texture.height * scale)
+                };
+                DrawTexturePro(mandelbrotTexture.texture, origMandie, zoomChangeMandie, (Vector2){0, 0}, 0.0f, WHITE);
+            }
         }
-        
+
+
+        // MORE INFO display
         if (toggledMoreInfo) {
-            Rectangle moreInfoBox = { 5, 5, 300, 150 };
+            Rectangle moreInfoBox = { 5, 5, 300, 300 };
             DrawRectangleRounded(moreInfoBox, 0.1f, 16, Fade(BLACK, 0.8f));
 
             DrawFPS(15, 15);
             DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 15, 35, 20, WHITE);
-            DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 15).c_str()), 15, 55, 20, WHITE);
-            DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 15).c_str()), 15, 75, 20, WHITE);
+            DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 10).c_str()), 15, 55, 20, WHITE);
+            DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 10).c_str()), 15, 75, 20, WHITE);
+
+            int lengthInput;
+            // Textboxes and checkboxes options
+            // if statement is necessary because the textboxes have a lot of code that i don'T want to see all the time
+            if (true) {
+                // Iteration amount input area
+                Rectangle detailInputBox = { 15, 100, 100, 30 };
+                if (editingDetail) {
+                    DrawRectangleRec(detailInputBox, Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(detailInputBox, Fade(WHITE, 0.1f));
+                }
+                DrawText(detailInputText, 20, 105, 20, WHITE);
+                DrawText("Iterations", 125, 105, 20, WHITE);
+
+                if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    editingDetail = true;
+                }
+                if (editingDetail) {
+                    int key = GetCharPressed();
+                    lengthInput = strlen(detailInputText);
+                    if (key >= '0' && key <= '9' && lengthInput < 5) {
+                        detailInputText[lengthInput] = (char)key;
+                        detailInputText[lengthInput + 1] = '\0';
+                    }
+                    if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
+                        detailInputText[lengthInput - 1] = '\0';
+                    }
+                    if (IsKeyPressed(KEY_ENTER)) {
+                        detailAmt = atoi(detailInputText);
+                        if (detailAmt < 10) detailAmt = 10;
+                        needsRedraw = true;
+                        editingDetail = false;
+                    }
+                }
+
+                // Editing zoom speed
+                Rectangle zoomSpeedInputBox = { 15, 135, 100, 30 };
+                if (editingZoomSpeed) {
+                    DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.1f));
+                }
+                DrawText(zoomSpeedInputText, 20, 140, 20, WHITE);
+                DrawText("Zoom speed", 125, 140, 20, WHITE);
+
+                if (CheckCollisionPointRec(GetMousePosition(), zoomSpeedInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    editingZoomSpeed = true;
+                }
+                if (editingZoomSpeed) {
+                    int key = GetCharPressed();
+                    lengthInput = strlen(zoomSpeedInputText);
+                    if (key >= '0' && key <= '9' && lengthInput < 5) {
+                        zoomSpeedInputText[lengthInput] = (char)key;
+                        zoomSpeedInputText[lengthInput + 1] = '\0';
+                    }
+                    if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
+                        zoomSpeedInputText[lengthInput - 1] = '\0';
+                    }
+                    if (IsKeyPressed(KEY_ENTER)) {
+                        zoomSpeed = atoi(zoomSpeedInputText);
+                        if (zoomSpeed < 5) zoomSpeed = 5;
+                        if (zoomSpeed > 200) zoomSpeed = 200;
+                        // This seems kind of strage but turning up zoomspeed actually makes it slower for some reason lol but this is more intuitive
+                        zoomSpeed = (200 / zoomSpeed) * 5 * 2.5f;
+                        editingZoomSpeed = false;
+                    }
+                }
+            }
+
         }
 
         EndDrawing();
