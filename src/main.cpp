@@ -45,6 +45,8 @@ int detailAmt = 250;
 
 bool toggledMoreInfo = true;
 
+Color yefoiGrey = (Color){ 27, 27, 27 };
+
 void drawNewZoomArea() {
     long double scale = oldZoomFactor / zoomFactor;
     Rectangle outline = {
@@ -318,12 +320,12 @@ int main(void) {
         
         if (toggledMoreInfo) {
             Rectangle moreInfoBox = { 5, 5, 300, 150 };
-            DrawRectangleRounded(moreInfoBox, 0.1f, 16, BLACK);
+            DrawRectangleRounded(moreInfoBox, 0.1f, 16, Fade(BLACK, 0.8f));
 
-            DrawFPS(10, 10);
-            DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 10, 30, 20, DARKGRAY);
-            DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 15).c_str()), 10, 50, 20, DARKGRAY);
-            DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 15).c_str()), 10, 70, 20, DARKGRAY);
+            DrawFPS(15, 15);
+            DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 15, 35, 20, WHITE);
+            DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 15).c_str()), 15, 55, 20, WHITE);
+            DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 15).c_str()), 15, 75, 20, WHITE);
         }
 
         EndDrawing();
