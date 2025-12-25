@@ -8,16 +8,17 @@
 // Local coordinates
 // Made shading work!
 // Better UI
+// Even better UI with more checkboxes
 
 // Optimizations / features to make:
-// Loading screen so that you dont move during calculations
-// Even better UI with more checkboxes
+// Collapsable side area
+// Loading screen so that you dont move during calculations (Multithreading)
 // FIX PERIODICTY CODE!!!!
+// Dynamic zoom functionality
 // Add a number line, mouse pointer coord display
 // Paramaterize z, make Julia set
 
-
-
+// Multithreading :)
 
 #include <math.h>
 #include <cstdlib>
@@ -28,9 +29,13 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <future>
+#include <climits>
+#include <thread>
 
 #include "raylib.h"
 #include "raymath.h"
+
 
 // What I use instead of Vector2! They only go up to floats which isn't super helpful...
 struct SuperVector2 {
@@ -57,6 +62,9 @@ char zoomSpeedInputText[6] = "50";
 long double zoomSpeed = 50;
 
 bool usingBoxZoom = false;
+bool dynamicIteration = false;
+
+
 /*
 Color yefoiGrey = (Color){ 27, 27, 27 };
 */
@@ -69,46 +77,6 @@ void drawIntercepts(long double offsetX, long double offsetY) {
 }
 
 // Apparently the periodicty code doesnt work AT ALL! Be sure to look into ts later
-bool isInMandelbrot(std::complex<long double> c) {
-    // c is the complex parameter/number that is being tested to see if its in the set
-    // z is the current iteration of the mandelbrot result, and z_old is the previous one, used to detect periodicity and such
-
-    std::complex<long double> z(0.0L, 0.0L);
-    // Figuring out if the thing is in the main cardiod or not
-    if ((c.real() + 0.25L) * (c.real() + 0.25L) + c.imag() * c.imag() < 0.25L) {
-        return true;
-    }
-    // Figuring out if its in the second cardiod
-    if ((c.real() + 1.0L) * (c.real() + 1.0L) + c.imag() * c.imag() < 0.06L) {
-        return true;
-    }
-    // Figuring out if the x val is over 0.5
-    if (c.real() > 0.5L) {
-        return false;
-    }
-    // Figuring out if the y val is over 1.2 (Imaginary)
-    if (std::abs(c.imag()) > 1.2L) {
-        return false;
-    }
-    // These early breaks might be helpful for bigger pictures maybe by like a few percent lol
-
-    std::complex<long double> z_old(0.0L, 0.0L);
-    int period = 0;
-    for (int i = 0; i < detailAmt; i++) {
-        z = z * z + c;
-        if (std::abs(z) > 2.0L) {
-            return false; 
-        }
-        if (i == period) {
-            if (std::abs(z - z_old) < 1e-10L) {
-                return true;
-            }
-            z_old = z;
-            period = i;
-        }
-    }
-    return true; 
-}
 
 // Exact same code as above, HOWEVER, it returns the amount of iterations needed to escape.
 // If it doesn't escape with the given detailAmt, then it's marked as -1
@@ -116,17 +84,16 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
     std::complex<long double> z(0.0L, 0.0L);
     std::complex<long double> z_old(0.0L, 0.0L);
     int period = 0;
-    for (int i = 0; i < detailAmt; i++)
-    {
+    for (int i = 0; i < detailAmt; i++) {
         z = z * z + c;
-        if (std::abs(z) > 2.0L)
-        {
+        // Apparently norm is faster!
+        if (std::norm(z) > 4.0L) {
             return i + 1;
         }
-        if (i == period)
-        {
-            if (std::abs(z - z_old) < 1e-10L)
-            {
+        
+        // Fixed periodicty check
+        if (i == period) {
+            if (std::abs(z - z_old) < 1e-10L) {
                 return -1;
             }
             z_old = z;
@@ -134,8 +101,6 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
         }
     }
     return -1;
-
-    
 }
 
 std::vector<int> allEscapeValues;
@@ -248,11 +213,12 @@ std::string truncateZeroes(long double input, int truncateAmount) {
 int main(void) {
     SuperVector2 offset = {0, 0};
     SuperVector2 renderOffset = {0, 0}; 
-    InitWindow(900, 400, "Mandelbrot");
+    InitWindow(800, 800, "Mandelbrot");
     
     // miss mandie
     RenderTexture2D mandelbrotTexture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     bool needsRedraw = true;
+
 
     SetTargetFPS(120);
     
@@ -413,7 +379,30 @@ int main(void) {
                         editingZoomSpeed = false;
                     }
                 }
+
+                Rectangle dynamicIterationAdjustment = {15, 170, 30, 30};
+                if (dynamicIteration) {
+                    DrawRectangleRec(dynamicIterationAdjustment, Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(dynamicIterationAdjustment, Fade(WHITE, 0.1f));
+                }
+                DrawText("Dynamic Iteration Adjustment", 55, 175, 20, WHITE);
+                if (CheckCollisionPointRec(GetMousePosition(), dynamicIterationAdjustment) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    dynamicIteration = !dynamicIteration;
+                }
+
+                Rectangle boxZoomCheckbox = {15, 205, 30, 30};
+                if (usingBoxZoom) {
+                    DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.1f));
+                }
+                DrawText("Dynamic Zoom", 55, 210, 20, WHITE);
+                if (CheckCollisionPointRec(GetMousePosition(), boxZoomCheckbox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    usingBoxZoom = !usingBoxZoom;
+                }
             }
+
 
         }
 
