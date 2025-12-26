@@ -9,6 +9,7 @@
 // Made shading work!
 // Better UI
 // Even better UI with more checkboxes
+// Multithreaded so hard
 
 // Optimizations / features to make:
 // Collapsable side area
@@ -17,9 +18,6 @@
 // Dynamic zoom functionality
 // Add a number line, mouse pointer coord display
 // Paramaterize z, make Julia set
-
-// I want to try multithreading but it is really hard...
-// Threads in c++, maybe later?
 
 // Dead rails
 
@@ -69,6 +67,8 @@ bool dynamicIteration = false;
 
 // Make threads customizable some day!
 int threadz = 4;
+bool editingThreadCount = false;
+char threadCountInputText[6] = "4";
 /*
 Color yefoiGrey = (Color){ 27, 27, 27 };
 */
@@ -136,26 +136,30 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     allEscapeValues.clear();
     relativeEscapeValueColors.clear();
 
-    // Pure genius hard coded 4 threads (real)
-    std::vector<int> t1List;
-    std::vector<int> t2List;
-    std::vector<int> t3List;
-    std::vector<int> t4List;
+    // no longer hard coded
+    std::vector<std::vector<int>> tLists(threadz);
+    int stripWidth = setWidth / threadz;
 
-    std::thread t1([&]() { giveMandelbrotOutputsInRange(0, (setWidth / threadz), setWidth, setHeight, centerReal, centerImag, t1List); });
-    std::thread t2([&]() { giveMandelbrotOutputsInRange((setWidth / threadz), (setWidth / threadz) * 2, setWidth, setHeight, centerReal, centerImag, t2List); });
-    std::thread t3([&]() { giveMandelbrotOutputsInRange((setWidth / threadz) * 2, (setWidth / threadz) * 3, setWidth, setHeight, centerReal, centerImag, t3List); });
-    std::thread t4([&]() { giveMandelbrotOutputsInRange((setWidth / threadz) * 3, setWidth, setWidth, setHeight, centerReal, centerImag, t4List); });
+    std::vector<std::thread> threadsList;
+    for (int i = 0; i < threadz; i++) {
+        threadsList.push_back(std::thread([&, i]() { 
+            int endPosition;
+            if (i == threadz - 1) {
+                endPosition = setWidth;
+            } else {
+                endPosition = stripWidth * (i + 1);
+            }
+            giveMandelbrotOutputsInRange(stripWidth * i, endPosition, setWidth, setHeight, centerReal, centerImag, tLists[i]); 
+        }));
+    }
 
-    t1.join();
-    t2.join();
-    t3.join();
-    t4.join();
+    for (int i = 0; i < threadsList.size(); i++) {
+        threadsList[i].join();
+    }
 
-    allEscapeValues.insert(allEscapeValues.end(), t1List.begin(), t1List.end());
-    allEscapeValues.insert(allEscapeValues.end(), t2List.begin(), t2List.end());
-    allEscapeValues.insert(allEscapeValues.end(), t3List.begin(), t3List.end());
-    allEscapeValues.insert(allEscapeValues.end(), t4List.begin(), t4List.end());
+    for (int i = 0; i < tLists.size(); i++) {
+        allEscapeValues.insert(allEscapeValues.end(), tLists[i].begin(), tLists[i].end());
+    }
 
     int minimumEscapeIterations = INT_MAX;
     int maximumEscapeIterations = INT_MIN;
@@ -337,7 +341,8 @@ int main(void) {
         // MORE INFO display
         if (toggledMoreInfo) {
             Rectangle moreInfoBox = { 5, 5, 300, 300 };
-            DrawRectangleRounded(moreInfoBox, 0.1f, 16, Fade(BLACK, 0.8f));
+            DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
+            DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
 
             DrawFPS(15, 15);
             DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 15, 35, 20, WHITE);
@@ -348,6 +353,7 @@ int main(void) {
             // Textboxes and checkboxes options
             // if statement is necessary because the textboxes have a lot of code that i don'T want to see all the time
             if (true) {
+
                 // Iteration amount input area
                 Rectangle detailInputBox = { 15, 100, 100, 30 };
                 if (editingDetail) {
@@ -355,11 +361,14 @@ int main(void) {
                 } else {
                     DrawRectangleRec(detailInputBox, Fade(WHITE, 0.1f));
                 }
+                DrawRectangleLinesEx(detailInputBox, 1, Fade(WHITE, 0.5f));
                 DrawText(detailInputText, 20, 105, 20, WHITE);
                 DrawText("Iterations", 125, 105, 20, WHITE);
 
                 if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     editingDetail = true;
+                    editingZoomSpeed = false;
+                    editingThreadCount = false;
                 }
                 if (editingDetail) {
                     int key = GetCharPressed();
@@ -373,7 +382,9 @@ int main(void) {
                     }
                     if (IsKeyPressed(KEY_ENTER)) {
                         detailAmt = atoi(detailInputText);
-                        if (detailAmt < 10) detailAmt = 10;
+                        if (detailAmt < 10) {
+                            detailAmt = 10;
+                        }
                         needsRedraw = true;
                         editingDetail = false;
                     }
@@ -386,11 +397,14 @@ int main(void) {
                 } else {
                     DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.1f));
                 }
+                DrawRectangleLinesEx(zoomSpeedInputBox, 1, Fade(WHITE, 0.5f));
                 DrawText(zoomSpeedInputText, 20, 140, 20, WHITE);
                 DrawText("Zoom speed", 125, 140, 20, WHITE);
 
                 if (CheckCollisionPointRec(GetMousePosition(), zoomSpeedInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     editingZoomSpeed = true;
+                    editingDetail = false;
+                    editingThreadCount = false;
                 }
                 if (editingZoomSpeed) {
                     int key = GetCharPressed();
@@ -404,8 +418,12 @@ int main(void) {
                     }
                     if (IsKeyPressed(KEY_ENTER)) {
                         zoomSpeed = atoi(zoomSpeedInputText);
-                        if (zoomSpeed < 5) zoomSpeed = 5;
-                        if (zoomSpeed > 200) zoomSpeed = 200;
+                        if (zoomSpeed < 5) {
+                            zoomSpeed = 5;
+                        }
+                        if (zoomSpeed > 200) {
+                            zoomSpeed = 200;
+                        }
                         // This seems kind of strage but turning up zoomspeed actually makes it slower for some reason lol but this is more intuitive
                         zoomSpeed = (200 / zoomSpeed) * 5 * 2.5f;
                         editingZoomSpeed = false;
@@ -418,7 +436,8 @@ int main(void) {
                 } else {
                     DrawRectangleRec(dynamicIterationAdjustment, Fade(WHITE, 0.1f));
                 }
-                DrawText("Dynamic Iteration Adjustment", 55, 175, 20, WHITE);
+                DrawRectangleLinesEx(dynamicIterationAdjustment, 1, Fade(WHITE, 0.5f));
+                DrawText("Iteration Adjustment", 55, 175, 20, WHITE);
                 if (CheckCollisionPointRec(GetMousePosition(), dynamicIterationAdjustment) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     dynamicIteration = !dynamicIteration;
                 }
@@ -429,10 +448,51 @@ int main(void) {
                 } else {
                     DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.1f));
                 }
-                DrawText("Dynamic Zoom", 55, 210, 20, WHITE);
+                DrawRectangleLinesEx(boxZoomCheckbox, 1, Fade(WHITE, 0.5f));
+                DrawText("Use box zoom", 55, 210, 20, WHITE);
                 if (CheckCollisionPointRec(GetMousePosition(), boxZoomCheckbox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     usingBoxZoom = !usingBoxZoom;
                 }
+
+
+                Rectangle threadCountInputBox = { 15, 240, 100, 30 };
+                if (editingThreadCount) {
+                    DrawRectangleRec(threadCountInputBox, Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(threadCountInputBox, Fade(WHITE, 0.1f));
+                }
+                DrawRectangleLinesEx(threadCountInputBox, 1, Fade(WHITE, 0.5f));
+                DrawText(threadCountInputText, 20, 245, 20, WHITE);
+                DrawText("Threads", 125, 245, 20, WHITE);
+
+                if (CheckCollisionPointRec(GetMousePosition(), threadCountInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    editingThreadCount = true;
+                    editingDetail = false;
+                    editingZoomSpeed = false;
+                }
+                if (editingThreadCount) {
+                    int key = GetCharPressed();
+                    lengthInput = strlen(threadCountInputText);
+                    if (key >= '0' && key <= '9' && lengthInput < 5) {
+                        threadCountInputText[lengthInput] = (char)key;
+                        threadCountInputText[lengthInput + 1] = '\0';
+                        
+                    }
+                    if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
+                        threadCountInputText[lengthInput - 1] = '\0';
+                    }
+                    if (IsKeyPressed(KEY_ENTER)) {
+                        int newThreadCount = atoi(threadCountInputText);
+                        if (newThreadCount < 1) newThreadCount = 1;
+                        if (newThreadCount > 32) newThreadCount = 32;
+
+                        threadz = newThreadCount;
+                        editingThreadCount = false;
+                        needsRedraw = true;
+                    }
+                }
+
+
             }
 
 
@@ -445,3 +505,4 @@ int main(void) {
     CloseWindow();
     return 0;
 }
+
