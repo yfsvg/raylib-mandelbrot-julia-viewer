@@ -18,7 +18,11 @@
 // Add a number line, mouse pointer coord display
 // Paramaterize z, make Julia set
 
-// Multithreading :)
+// I want to try multithreading but it is really hard...
+// Threads in c++, maybe later?
+
+// Dead rails
+
 
 #include <math.h>
 #include <cstdlib>
@@ -29,9 +33,8 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <future>
-#include <climits>
 #include <thread>
+#include <mutex>
 
 #include "raylib.h"
 #include "raymath.h"
@@ -64,7 +67,8 @@ long double zoomSpeed = 50;
 bool usingBoxZoom = false;
 bool dynamicIteration = false;
 
-
+// Make threads customizable some day!
+int threadz = 4;
 /*
 Color yefoiGrey = (Color){ 27, 27, 27 };
 */
@@ -78,6 +82,7 @@ void drawIntercepts(long double offsetX, long double offsetY) {
 
 // Apparently the periodicty code doesnt work AT ALL! Be sure to look into ts later
 
+
 // Exact same code as above, HOWEVER, it returns the amount of iterations needed to escape.
 // If it doesn't escape with the given detailAmt, then it's marked as -1
 int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
@@ -86,12 +91,9 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
     int period = 0;
     for (int i = 0; i < detailAmt; i++) {
         z = z * z + c;
-        // Apparently norm is faster!
-        if (std::norm(z) > 4.0L) {
+        if (std::abs(z) > 2.0L) {
             return i + 1;
         }
-        
-        // Fixed periodicty check
         if (i == period) {
             if (std::abs(z - z_old) < 1e-10L) {
                 return -1;
@@ -101,17 +103,29 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
         }
     }
     return -1;
+
+    
 }
 
 std::vector<int> allEscapeValues;
 std::vector<Color> relativeEscapeValueColors;
 
-// Changed the implementation of the way that the texture is shown, instead of calculating everything
-// Only redraw the texture after each change in perspective
-void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, long double offsetY) {
-    BeginTextureMode(mandieSet);
-    ClearBackground(RAYWHITE);
+void giveMandelbrotOutputsInRange(int startX, int endX, int setWidth, int setHeight, long double centerReal, long double centerImag, std::vector<int>& returnVector) {
+    // performance smiling
+    returnVector.reserve((endX - startX) * setHeight);
+    for (int x = startX; x < endX; x++) {
+        for (int y = 0; y < setHeight; y++) {
+            // converting 0-based screen coordinates because the function demands actual mathematical coords
+            long double real = centerReal + ((x - setWidth/2.0) / zoomFactor);
+            long double imag = centerImag + ((y - setHeight/2.0) / zoomFactor);
+            returnVector.push_back(isInMandlebrotButGiveIterationsToEscape(std::complex<long double>(real, imag)));
+        }
+    }
+}
 
+void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, long double offsetY) {
+    // Only begin texture mode when we are actually ready to draw
+    // but we need dimensions now...
     int setWidth = mandieSet.texture.width;
     int setHeight = mandieSet.texture.height;
 
@@ -121,51 +135,70 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
 
     allEscapeValues.clear();
     relativeEscapeValueColors.clear();
-    for (int x = setWidth * -0.5; x <= setWidth * 0.5; x++) {
-        for (int y = setHeight * -0.5; y <= setHeight * 0.5; y++) {
-            long double real = centerReal + x / zoomFactor;
-            long double imag = centerImag + y / zoomFactor;
 
-            allEscapeValues.push_back(isInMandlebrotButGiveIterationsToEscape(std::complex<long double>(real, imag)));
-        }
-    }
+    // Pure genius hard coded 4 threads (real)
+    std::vector<int> t1List;
+    std::vector<int> t2List;
+    std::vector<int> t3List;
+    std::vector<int> t4List;
 
-    // Find min and max escape values because the coloring is relative
+    std::thread t1([&]() { giveMandelbrotOutputsInRange(0, (setWidth / threadz), setWidth, setHeight, centerReal, centerImag, t1List); });
+    std::thread t2([&]() { giveMandelbrotOutputsInRange((setWidth / threadz), (setWidth / threadz) * 2, setWidth, setHeight, centerReal, centerImag, t2List); });
+    std::thread t3([&]() { giveMandelbrotOutputsInRange((setWidth / threadz) * 2, (setWidth / threadz) * 3, setWidth, setHeight, centerReal, centerImag, t3List); });
+    std::thread t4([&]() { giveMandelbrotOutputsInRange((setWidth / threadz) * 3, setWidth, setWidth, setHeight, centerReal, centerImag, t4List); });
+
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+
+    allEscapeValues.insert(allEscapeValues.end(), t1List.begin(), t1List.end());
+    allEscapeValues.insert(allEscapeValues.end(), t2List.begin(), t2List.end());
+    allEscapeValues.insert(allEscapeValues.end(), t3List.begin(), t3List.end());
+    allEscapeValues.insert(allEscapeValues.end(), t4List.begin(), t4List.end());
+
     int minimumEscapeIterations = INT_MAX;
     int maximumEscapeIterations = INT_MIN;
     for (size_t i = 0; i < allEscapeValues.size(); i++) {
-        int val = allEscapeValues[i];
-        if (val != -1) {
-            minimumEscapeIterations = std::min(minimumEscapeIterations, val);
-            maximumEscapeIterations = std::max(maximumEscapeIterations, val);
+        if (allEscapeValues[i] != -1) {
+            if (allEscapeValues[i] < minimumEscapeIterations) {
+                minimumEscapeIterations = allEscapeValues[i];
+            }
+            if (allEscapeValues[i] > maximumEscapeIterations) {
+                maximumEscapeIterations = allEscapeValues[i];
+            }
         }
     }
 
-    // Coloring the colors based on escape values
-    for (size_t i = 0; i < allEscapeValues.size(); i++) {
-        int val = allEscapeValues[i];
-
+    //
+    for (int val : allEscapeValues) {
         if (val == -1) {
             relativeEscapeValueColors.push_back(BLACK);
         } else {
-            float t = (float)(val - minimumEscapeIterations) / (maximumEscapeIterations - minimumEscapeIterations);
+            float range = (float) (maximumEscapeIterations - minimumEscapeIterations);
+            if (range == 0) {
+                range = 1.0f; 
+            }
 
-            relativeEscapeValueColors.push_back(
-                ColorFromHSV(t * 360.0f, 1.0f, 1.0f)
-            );
+            float t = (float) (val - minimumEscapeIterations) / range;
+
+            relativeEscapeValueColors.push_back(ColorFromHSV(t * 360.0f, 1.0f, 1.0f));
         }
     }
 
-
+    
+    BeginTextureMode(mandieSet);
+    ClearBackground(RAYWHITE);
+    
     int idx = 0;
-    for (int x = setWidth * -0.5; x <= setWidth * 0.5; x++) {
-        for (int y = setHeight * -0.5; y <= setHeight * 0.5; y++) {
-            DrawRectangle(setWidth / 2 + x, setHeight / 2 + y, 1, 1, relativeEscapeValueColors[idx++]);
+    for (int x = 0; x < setWidth; x++) {
+        for (int y = 0; y < setHeight; y++) {
+            // Safety check to ensure we don't go out of bounds
+            if (idx < relativeEscapeValueColors.size()) {
+                DrawRectangle(x, y, 1, 1, relativeEscapeValueColors[idx++]);
+            }
         }
     }
-
-        // If the heat map is on, then use the isInMandlebrotButGiveIterationsToEscape function, not implemented yet but this is how i want to do it:
-        // Go through each pixel, just like the nested for loops below
 
     EndTextureMode();
 }
@@ -213,12 +246,11 @@ std::string truncateZeroes(long double input, int truncateAmount) {
 int main(void) {
     SuperVector2 offset = {0, 0};
     SuperVector2 renderOffset = {0, 0}; 
-    InitWindow(800, 800, "Mandelbrot");
+    InitWindow(600, 600, "Mandelbrot");
     
     // miss mandie
     RenderTexture2D mandelbrotTexture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
     bool needsRedraw = true;
-
 
     SetTargetFPS(120);
     
