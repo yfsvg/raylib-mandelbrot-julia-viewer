@@ -15,7 +15,6 @@
 // Collapsable side area
 // Loading screen so that you dont move during calculations (Multithreading)
 // FIX PERIODICTY CODE!!!!
-// Dynamic zoom functionality
 // Add a number line, mouse pointer coord display
 // Paramaterize z, make Julia set
 
@@ -33,6 +32,8 @@
 #include <sstream>
 #include <thread>
 #include <mutex>
+
+#include <gmpxx.h>
 
 #include "raylib.h"
 #include "raymath.h"
@@ -63,12 +64,17 @@ char zoomSpeedInputText[6] = "50";
 long double zoomSpeed = 50;
 
 bool usingBoxZoom = false;
+/*
 bool dynamicIteration = false;
+*/
 
 // Make threads customizable some day!
 int threadz = 4;
 bool editingThreadCount = false;
 char threadCountInputText[6] = "4";
+
+bool usingArbitraryPrecisionLibrary = false;
+
 /*
 Color yefoiGrey = (Color){ 27, 27, 27 };
 */
@@ -429,7 +435,7 @@ int main(void) {
                         editingZoomSpeed = false;
                     }
                 }
-
+                /*
                 Rectangle dynamicIterationAdjustment = {15, 170, 30, 30};
                 if (dynamicIteration) {
                     DrawRectangleRec(dynamicIterationAdjustment, Fade(WHITE, 0.3f));
@@ -440,6 +446,30 @@ int main(void) {
                 DrawText("Iteration Adjustment", 55, 175, 20, WHITE);
                 if (CheckCollisionPointRec(GetMousePosition(), dynamicIterationAdjustment) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     dynamicIteration = !dynamicIteration;
+                    if (dynamicIteration) {
+                        automaticIterationAdjustment();
+                        needsRedraw = true;
+                        editingZoomSpeed = false;
+                        editingDetail = false;
+                        editingThreadCount = false;
+                    }
+                }
+                */
+
+                Rectangle arbitraryPrecisionLibraryBox = {15, 170, 30, 30};
+                if (usingArbitraryPrecisionLibrary) {
+                    DrawRectangleRec(arbitraryPrecisionLibraryBox, Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(arbitraryPrecisionLibraryBox, Fade(WHITE, 0.1f));
+                }
+                DrawRectangleLinesEx(arbitraryPrecisionLibraryBox, 1, Fade(WHITE, 0.5f));
+                DrawText("Arbitrary Precision", 55, 175, 20, WHITE);
+                if (CheckCollisionPointRec(GetMousePosition(), arbitraryPrecisionLibraryBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    usingArbitraryPrecisionLibrary = !usingArbitraryPrecisionLibrary;
+                    editingZoomSpeed = false;
+                    editingDetail = false;
+                    editingThreadCount = false;
+
                 }
 
                 Rectangle boxZoomCheckbox = {15, 205, 30, 30};
@@ -452,6 +482,9 @@ int main(void) {
                 DrawText("Use box zoom", 55, 210, 20, WHITE);
                 if (CheckCollisionPointRec(GetMousePosition(), boxZoomCheckbox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     usingBoxZoom = !usingBoxZoom;
+                    editingZoomSpeed = false;
+                    editingDetail = false;
+                    editingThreadCount = false;
                 }
 
 
