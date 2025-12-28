@@ -45,6 +45,7 @@ mpf_class arbOldZoomFactor = arbZoomFactor;
 int detailAmt = 250;
 
 bool toggledMoreInfo = true;
+float moreInfoOffset = 0;
 
 bool editingDetail = false;
 char detailInputText[6] = "250";
@@ -60,6 +61,8 @@ bool editingThreadCount = false;
 char threadCountInputText[6] = "4";
 
 bool usingArbitraryPrecisionLibrary = false;
+
+int detailLevelUsed = 4;
 
 
 // rectangle zoom relocated to main
@@ -368,6 +371,7 @@ std::string truncateZeroes(long double input, int truncateAmount) {
 }
 // Using massive amounts 
 
+
 // It took me hours to figure out why there was an issue but apparently to_string has a precision limit too so this method works better
 mpf_class longDoubleToMpf(long double toTurn) {
     std::stringstream ss;
@@ -384,8 +388,10 @@ int main(void) {
     SuperVector2 renderOffset = {0, 0};
     ArbVector2 arbOffset = {0, 0};
     ArbVector2 arbRenderOffset = {0, 0};
-    InitWindow(600, 600, "Mandelbrot");
-    
+
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(1200, 700, "Mandelbrot");
+
 
     // miss mandie
     RenderTexture2D mandelbrotTexture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
@@ -397,7 +403,13 @@ int main(void) {
     long double previousZoom = zoomFactor;
     mpf_class previousArbZoom = arbZoomFactor;
     
+
     while (!WindowShouldClose()) {
+        if (IsWindowResized()) {
+            UnloadRenderTexture(mandelbrotTexture);
+            mandelbrotTexture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+            needsRedraw = true;
+        }
         
         // Synchronizing measurements whe turning 
         if (usingArbitraryPrecisionLibrary && !lastFrameWasArb) {
@@ -481,10 +493,7 @@ int main(void) {
                 }
             }
         }
-        
-        if (IsKeyPressed(KEY_I)) {
-            toggledMoreInfo = !toggledMoreInfo;
-        }
+    
 
         if (needsRedraw && !movingRightNow) {
             canMove = false;
@@ -548,190 +557,231 @@ int main(void) {
             }
         }
 
+        if (IsKeyPressed(KEY_I)) {
+            toggledMoreInfo = !toggledMoreInfo;
+        }
+        if (toggledMoreInfo) {
+            moreInfoOffset += (0 - moreInfoOffset) / 10;
+        } else {
+            moreInfoOffset += (-320 - moreInfoOffset) / 10;
+        }
 
         // MORE INFO display
-        if (toggledMoreInfo) {
-            Rectangle moreInfoBox = { 5, 5, 300, 300 };
-            DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
-            DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
+        Rectangle moreInfoBox = { 5 + moreInfoOffset, 5, 300, 400 };
+        DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
+        DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
 
-            DrawFPS(15, 15);
-            
-            if (usingArbitraryPrecisionLibrary) {
-                std::stringstream ss; 
-                ss << arbZoomFactor;
-                std::string z = ss.str().substr(0, 15);
-                
-                ss.str(""); ss << (arbOffset.x / arbZoomFactor);
-                std::string x = ss.str().substr(0, 15);
-                
-                ss.str(""); ss << (arbOffset.y / arbZoomFactor);
-                std::string y = ss.str().substr(0, 15);
-
-                DrawText(TextFormat("Zoom: %s...", z.c_str()), 15, 35, 20, WHITE);
-                DrawText(TextFormat("X Pos: %s...", x.c_str()), 15, 55, 20, WHITE);
-                DrawText(TextFormat("Y Pos: %s...", y.c_str()), 15, 75, 20, WHITE);
-            } else {
-                DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 15, 35, 20, WHITE);
-                DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 10).c_str()), 15, 55, 20, WHITE);
-                DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 10).c_str()), 15, 75, 20, WHITE);
-            }
-
-            int lengthInput;
-            // Textboxes and checkboxes options
-            // if statement is necessary because the textboxes have a lot of code that i don'T want to see all the time
-            if (true) {
-
-                // Iteration amount input area
-                Rectangle detailInputBox = { 15, 100, 100, 30 };
-                if (editingDetail) {
-                    DrawRectangleRec(detailInputBox, Fade(WHITE, 0.3f));
-                } else {
-                    DrawRectangleRec(detailInputBox, Fade(WHITE, 0.1f));
-                }
-                DrawRectangleLinesEx(detailInputBox, 1, Fade(WHITE, 0.5f));
-                DrawText(detailInputText, 20, 105, 20, WHITE);
-                DrawText("Iterations", 125, 105, 20, WHITE);
-
-                if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    editingDetail = true;
-                    editingZoomSpeed = false;
-                    editingThreadCount = false;
-                }
-                if (editingDetail) {
-                    int key = GetCharPressed();
-                    lengthInput = strlen(detailInputText);
-                    if (key >= '0' && key <= '9' && lengthInput < 5) {
-                        detailInputText[lengthInput] = (char)key;
-                        detailInputText[lengthInput + 1] = '\0';
-                    }
-                    if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
-                        detailInputText[lengthInput - 1] = '\0';
-                    }
-                    if (IsKeyPressed(KEY_ENTER)) {
-                        detailAmt = atoi(detailInputText);
-                        if (detailAmt < 10) {
-                            detailAmt = 10;
-                        }
-                        needsRedraw = true;
-                        editingDetail = false;
-                    }
-                }
-
-                // Editing zoom speed
-                Rectangle zoomSpeedInputBox = { 15, 135, 100, 30 };
-                if (editingZoomSpeed) {
-                    DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.3f));
-                } else {
-                    DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.1f));
-                }
-                DrawRectangleLinesEx(zoomSpeedInputBox, 1, Fade(WHITE, 0.5f));
-                DrawText(zoomSpeedInputText, 20, 140, 20, WHITE);
-                DrawText("Zoom speed", 125, 140, 20, WHITE);
-
-                if (CheckCollisionPointRec(GetMousePosition(), zoomSpeedInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    editingZoomSpeed = true;
-                    editingDetail = false;
-                    editingThreadCount = false;
-                }
-                if (editingZoomSpeed) {
-                    int key = GetCharPressed();
-                    lengthInput = strlen(zoomSpeedInputText);
-                    if (key >= '0' && key <= '9' && lengthInput < 5) {
-                        zoomSpeedInputText[lengthInput] = (char)key;
-                        zoomSpeedInputText[lengthInput + 1] = '\0';
-                    }
-                    if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
-                        zoomSpeedInputText[lengthInput - 1] = '\0';
-                    }
-                    if (IsKeyPressed(KEY_ENTER)) {
-                        zoomSpeed = atoi(zoomSpeedInputText);
-                        if (zoomSpeed < 5) {
-                            zoomSpeed = 5;
-                        }
-                        if (zoomSpeed > 200) {
-                            zoomSpeed = 200;
-                        }
-                        // This seems kind of strage but turning up zoomspeed actually makes it slower for some reason lol but this is more intuitive
-                        zoomSpeed = (200 / zoomSpeed) * 5 * 2.5f;
-                        editingZoomSpeed = false;
-                    }
-                }
-
-                Rectangle arbitraryPrecisionLibraryBox = {15, 170, 30, 30};
-                if (usingArbitraryPrecisionLibrary) {
-                    DrawRectangleRec(arbitraryPrecisionLibraryBox, Fade(WHITE, 0.3f));
-                } else {
-                    DrawRectangleRec(arbitraryPrecisionLibraryBox, Fade(WHITE, 0.1f));
-                }
-                DrawRectangleLinesEx(arbitraryPrecisionLibraryBox, 1, Fade(WHITE, 0.5f));
-                DrawText("Arbitrary Precision", 55, 175, 20, WHITE);
-                if (CheckCollisionPointRec(GetMousePosition(), arbitraryPrecisionLibraryBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    usingArbitraryPrecisionLibrary = !usingArbitraryPrecisionLibrary;
-                    editingZoomSpeed = false;
-                    editingDetail = false;
-                    editingThreadCount = false;
-                    needsRedraw = true; // Force redraw on switch
-                }
-
-                Rectangle boxZoomCheckbox = {15, 205, 30, 30};
-                if (usingBoxZoom) {
-                    DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.3f));
-                } else {
-                    DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.1f));
-                }
-                DrawRectangleLinesEx(boxZoomCheckbox, 1, Fade(WHITE, 0.5f));
-                DrawText("Use box zoom", 55, 210, 20, WHITE);
-                if (CheckCollisionPointRec(GetMousePosition(), boxZoomCheckbox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    usingBoxZoom = !usingBoxZoom;
-                    editingZoomSpeed = false;
-                    editingDetail = false;
-                    editingThreadCount = false;
-                }
-
-
-
-                Rectangle threadCountInputBox = { 15, 240, 100, 30 };
-                if (editingThreadCount) {
-                    DrawRectangleRec(threadCountInputBox, Fade(WHITE, 0.3f));
-                } else {
-                    DrawRectangleRec(threadCountInputBox, Fade(WHITE, 0.1f));
-                }
-                DrawRectangleLinesEx(threadCountInputBox, 1, Fade(WHITE, 0.5f));
-                DrawText(threadCountInputText, 20, 245, 20, WHITE);
-                DrawText("Threads", 125, 245, 20, WHITE);
-                if (CheckCollisionPointRec(GetMousePosition(), threadCountInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    editingThreadCount = true;
-                    editingDetail = false;
-                    editingZoomSpeed = false;
-                }
-                if (editingThreadCount) {
-                    int key = GetCharPressed();
-                    lengthInput = strlen(threadCountInputText);
-                    if (key >= '0' && key <= '9' && lengthInput < 5) {
-                        threadCountInputText[lengthInput] = (char)key;
-                        threadCountInputText[lengthInput + 1] = '\0';
-                        
-                    }
-                    if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
-                        threadCountInputText[lengthInput - 1] = '\0';
-                    }
-                    if (IsKeyPressed(KEY_ENTER)) {
-                        int newThreadCount = atoi(threadCountInputText);
-                        if (newThreadCount < 1) {
-                            newThreadCount = 1;
-                        }
-                        if (newThreadCount > 32) {
-                            newThreadCount = 32;
-                        }
-
-                        threadz = newThreadCount;
-                        editingThreadCount = false;
-                        needsRedraw = true;
-                    }
-                }
-            }
+        Rectangle collapseButton = {304 + moreInfoOffset, 15, 30, 50};
+        DrawRectangleRec(collapseButton, Fade(BLACK, 0.8f));
+        DrawRectangleLinesEx(collapseButton, 1, Fade(WHITE, 0.5f));
+        if (CheckCollisionPointRec(GetMousePosition(), collapseButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            editingZoomSpeed = true;
+            editingDetail = false;
+            editingThreadCount = false;
+            toggledMoreInfo = !toggledMoreInfo;
         }
+
+
+        
+
+
+        DrawFPS(15 + moreInfoOffset, 15);
+        
+        if (usingArbitraryPrecisionLibrary) {
+            std::stringstream ss; 
+            ss << arbZoomFactor;
+            std::string z = ss.str().substr(0, 15);
+            
+            ss.str(""); ss << (arbOffset.x / arbZoomFactor);
+            std::string x = ss.str().substr(0, 15);
+            
+            ss.str(""); ss << (arbOffset.y / arbZoomFactor);
+            std::string y = ss.str().substr(0, 15);
+
+            DrawText(TextFormat("Zoom: %s...", z.c_str()), 15 + moreInfoOffset, 35, 20, WHITE);
+            DrawText(TextFormat("X Pos: %s...", x.c_str()), 15 + moreInfoOffset, 55, 20, WHITE);
+            DrawText(TextFormat("Y Pos: %s...", y.c_str()), 15 + moreInfoOffset, 75, 20, WHITE);
+        } else {
+            DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 15 + moreInfoOffset, 35, 20, WHITE);
+            DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 10).c_str()), 15 + moreInfoOffset, 55, 20, WHITE);
+            DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 10).c_str()), 15 + moreInfoOffset, 75, 20, WHITE);
+        }
+
+        int lengthInput;
+        // Textboxes and checkboxes options
+        // if statement is necessary because the textboxes have a lot of code that i don'T want to see all the time
+        if (true) {
+
+            // Iteration amount input area
+            Rectangle detailInputBox = { 15 + moreInfoOffset, 100, 100, 30 };
+            if (editingDetail) {
+                DrawRectangleRec(detailInputBox, Fade(WHITE, 0.3f));
+            } else {
+                DrawRectangleRec(detailInputBox, Fade(WHITE, 0.1f));
+            }
+            DrawRectangleLinesEx(detailInputBox, 1, Fade(WHITE, 0.5f));
+            DrawText(detailInputText, 20 + moreInfoOffset, 105, 20, WHITE);
+            DrawText("Iterations", 125 + moreInfoOffset, 105, 20, WHITE);
+
+            if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                editingDetail = true;
+                editingZoomSpeed = false;
+                editingThreadCount = false;
+            }
+            if (editingDetail) {
+                int key = GetCharPressed();
+                lengthInput = strlen(detailInputText);
+                if (key >= '0' && key <= '9' && lengthInput < 5) {
+                    detailInputText[lengthInput] = (char)key;
+                    detailInputText[lengthInput + 1] = '\0';
+                }
+                if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
+                    detailInputText[lengthInput - 1] = '\0';
+                }
+                if (IsKeyPressed(KEY_ENTER)) {
+                    detailAmt = atoi(detailInputText);
+                    if (detailAmt < 10) {
+                        detailAmt = 10;
+                    }
+                    needsRedraw = true;
+                    editingDetail = false;
+                }
+            }
+
+            // Editing zoom speed
+            Rectangle zoomSpeedInputBox = { 15 + moreInfoOffset, 135, 100, 30 };
+            if (editingZoomSpeed) {
+                DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.3f));
+            } else {
+                DrawRectangleRec(zoomSpeedInputBox, Fade(WHITE, 0.1f));
+            }
+            DrawRectangleLinesEx(zoomSpeedInputBox, 1, Fade(WHITE, 0.5f));
+            DrawText(zoomSpeedInputText, 20 + moreInfoOffset, 140, 20, WHITE);
+            DrawText("Zoom speed", 125 + moreInfoOffset, 140, 20, WHITE);
+
+            if (CheckCollisionPointRec(GetMousePosition(), zoomSpeedInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                editingZoomSpeed = true;
+                editingDetail = false;
+                editingThreadCount = false;
+            }
+            if (editingZoomSpeed) {
+                int key = GetCharPressed();
+                lengthInput = strlen(zoomSpeedInputText);
+                if (key >= '0' && key <= '9' && lengthInput < 5) {
+                    zoomSpeedInputText[lengthInput] = (char)key;
+                    zoomSpeedInputText[lengthInput + 1] = '\0';
+                }
+                if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
+                    zoomSpeedInputText[lengthInput - 1] = '\0';
+                }
+                if (IsKeyPressed(KEY_ENTER)) {
+                    zoomSpeed = atoi(zoomSpeedInputText);
+                    if (zoomSpeed < 5) {
+                        zoomSpeed = 5;
+                    }
+                    if (zoomSpeed > 200) {
+                        zoomSpeed = 200;
+                    }
+                    // This seems kind of strage but turning up zoomspeed actually makes it slower for some reason lol but this is more intuitive
+                    zoomSpeed = (200 / zoomSpeed) * 5 * 2.5f;
+                    editingZoomSpeed = false;
+                }
+            }
+
+
+            Rectangle arbitraryPrecisionLibraryBox = {15 + moreInfoOffset, 170, 30, 30};
+            if (usingArbitraryPrecisionLibrary) {
+                DrawRectangleRec(arbitraryPrecisionLibraryBox, Fade(WHITE, 0.3f));
+            } else {
+                DrawRectangleRec(arbitraryPrecisionLibraryBox, Fade(WHITE, 0.1f));
+            }
+            DrawRectangleLinesEx(arbitraryPrecisionLibraryBox, 1, Fade(WHITE, 0.5f));
+            DrawText("Arbitrary Precision", 55 + moreInfoOffset, 175, 20, WHITE);
+            if (CheckCollisionPointRec(GetMousePosition(), arbitraryPrecisionLibraryBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                usingArbitraryPrecisionLibrary = !usingArbitraryPrecisionLibrary;
+                editingZoomSpeed = false;
+                editingDetail = false;
+                editingThreadCount = false;
+                needsRedraw = true; // Force redraw on switch
+            }
+
+
+            Rectangle boxZoomCheckbox = {15 + moreInfoOffset, 205, 30, 30};
+            if (usingBoxZoom) {
+                DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.3f));
+            } else {
+                DrawRectangleRec(boxZoomCheckbox, Fade(WHITE, 0.1f));
+            }
+            DrawRectangleLinesEx(boxZoomCheckbox, 1, Fade(WHITE, 0.5f));
+            DrawText("Use box zoom", 55 + moreInfoOffset, 210, 20, WHITE);
+            if (CheckCollisionPointRec(GetMousePosition(), boxZoomCheckbox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                usingBoxZoom = !usingBoxZoom;
+                editingZoomSpeed = false;
+                editingDetail = false;
+                editingThreadCount = false;
+            }
+
+
+            Rectangle threadCountInputBox = { 15 + moreInfoOffset, 240, 100, 30 };
+            if (editingThreadCount) {
+                DrawRectangleRec(threadCountInputBox, Fade(WHITE, 0.3f));
+            } else {
+                DrawRectangleRec(threadCountInputBox, Fade(WHITE, 0.1f));
+            }
+            DrawRectangleLinesEx(threadCountInputBox, 1, Fade(WHITE, 0.5f));
+            DrawText(threadCountInputText, 20 + moreInfoOffset, 245, 20, WHITE);
+            DrawText("Threads", 125 + moreInfoOffset, 245, 20, WHITE);
+            if (CheckCollisionPointRec(GetMousePosition(), threadCountInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                editingThreadCount = true;
+                editingDetail = false;
+                editingZoomSpeed = false;
+            }
+            if (editingThreadCount) {
+                int key = GetCharPressed();
+                lengthInput = strlen(threadCountInputText);
+                if (key >= '0' && key <= '9' && lengthInput < 5) {
+                    threadCountInputText[lengthInput] = (char)key;
+                    threadCountInputText[lengthInput + 1] = '\0';
+                    
+                }
+                if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
+                    threadCountInputText[lengthInput - 1] = '\0';
+                }
+                if (IsKeyPressed(KEY_ENTER)) {
+                    int newThreadCount = atoi(threadCountInputText);
+                    if (newThreadCount < 1) {
+                        newThreadCount = 1;
+                    }
+                    if (newThreadCount > 32) {
+                        newThreadCount = 32;
+                    }
+
+                    threadz = newThreadCount;
+                    editingThreadCount = false;
+                    needsRedraw = true;
+                }
+            }
+
+            DrawText("Detail level", 20 + moreInfoOffset, 270, 20, WHITE);
+            std::vector<Rectangle> detailLevelBoxes = {
+                {15 + moreInfoOffset, 295, 30, 30},
+                {50 + moreInfoOffset, 295, 30, 30},
+                {85 + moreInfoOffset, 295, 30, 30},
+                {120 + moreInfoOffset, 295, 30, 30},
+                {155 + moreInfoOffset, 295, 30, 30}
+            };
+            for (int i = 0; i < detailLevelBoxes.size(); i++) {
+                if (detailLevelUsed == i) {
+                    DrawRectangleRec(detailLevelBoxes[i], Fade(WHITE, 0.3f));
+                } else {
+                    DrawRectangleRec(detailLevelBoxes[i], Fade(WHITE, 0.1f));
+                }
+                DrawRectangleLinesEx(detailLevelBoxes[i], 1, Fade(WHITE, 0.5f));
+            }
+
+
+        }
+        
 
         EndDrawing();
     }
