@@ -17,21 +17,16 @@
 
 #include <gmpxx.h>
 
+#include "ui_types.hpp"
+#include "ui.hpp"
 
 #include "raylib.h"
 #include "raymath.h"
 
 
 // What I use instead of Vector2! They only go up to floats which isn't super helpful...
-struct SuperVector2 {
-    long double x;
-    long double y;
-};
 
-struct ArbVector2 {
-    mpf_class x;
-    mpf_class y;
-};
+
 
 SuperVector2 offset = {0, 0};
 SuperVector2 renderOffset = {0, 0};
@@ -78,6 +73,7 @@ Vector2 dragEndPos = { 0, 0 };
 
 bool timerInUse = false;
 float timer = 0.0f;
+
 
 // rectangle zoom relocated to main
 
@@ -368,21 +364,7 @@ ArbVector2 arbOffsetControls(mpf_class offsetX, mpf_class offsetY) {
 }
 
 // For easier displaying on the info side
-std::string truncateZeroes(long double input, int truncateAmount) {
-    std::stringstream ss;
-    // truncates
-    ss << std::setprecision(truncateAmount) << input;
-    std::string s_value = ss.str();
 
-    if (s_value.find('.') != std::string::npos) {
-        s_value.erase(s_value.find_last_not_of('0') + 1, std::string::npos);
-        if (s_value.back() == '.') {
-            s_value.pop_back();
-        }
-    }
-
-    return s_value;
-}
 // Using massive amounts 
 
 
@@ -645,9 +627,12 @@ int main(void) {
             DrawText(TextFormat("X Pos: %s...", x.c_str()), 15 + moreInfoOffset, 55, 20, WHITE);
             DrawText(TextFormat("Y Pos: %s...", y.c_str()), 15 + moreInfoOffset, 75, 20, WHITE);
         } else {
+            /*
             DrawText(TextFormat("Zoom: %s", truncateZeroes(zoomFactor, 15).c_str()), 15 + moreInfoOffset, 35, 20, WHITE);
             DrawText(TextFormat("X Pos: %s", truncateZeroes(offset.x / zoomFactor, 10).c_str()), 15 + moreInfoOffset, 55, 20, WHITE);
             DrawText(TextFormat("Y Pos: %s", truncateZeroes(offset.y / zoomFactor, 10).c_str()), 15 + moreInfoOffset, 75, 20, WHITE);
+            */
+            drawFPSRegular(zoomFactor, offset, moreInfoOffset);
         }
 
         int lengthInput;
@@ -823,7 +808,9 @@ int main(void) {
             }
 
 
+            /*
             DrawText(TextFormat("Timer: %s", truncateZeroes(timer, 3).c_str()), 20 + moreInfoOffset, 335, 20, WHITE);
+            */
         }
         
 
