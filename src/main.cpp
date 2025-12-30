@@ -33,6 +33,13 @@ struct ArbVector2 {
     mpf_class y;
 };
 
+SuperVector2 offset = {0, 0};
+SuperVector2 renderOffset = {0, 0};
+SuperVector2 oldOffset = offset;
+ArbVector2 arbOffset = {0, 0};
+ArbVector2 arbRenderOffset = {0, 0};
+ArbVector2 oldArbOffset = arbOffset;
+
 // To make sure that you don't move as pixels are being found
 bool canMove = true;
 bool movingRightNow = false;
@@ -64,6 +71,13 @@ bool usingArbitraryPrecisionLibrary = false;
 
 int detailLevelUsed = 4;
 
+bool usingMouseDragging = true;
+bool draggingMouse = false;
+Vector2 dragStartPos = { 0, 0 };
+Vector2 dragEndPos = { 0, 0 };
+
+bool timerInUse = false;
+float timer = 0.0f;
 
 // rectangle zoom relocated to main
 
@@ -304,7 +318,7 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
 }
 
 
-SuperVector2 offsetControls(long double offsetX, long double offsetY, RenderTexture2D mandelbrotTexture, SuperVector2 *renderOffset) {
+SuperVector2 offsetControls(long double offsetX, long double offsetY) {
     SuperVector2 returnVal = {offsetX, offsetY};
     movingRightNow = false;
     long double speed = 1.0L;
@@ -329,7 +343,7 @@ SuperVector2 offsetControls(long double offsetX, long double offsetY, RenderText
     return returnVal;
 }
 
-ArbVector2 arbOffsetControls(mpf_class offsetX, mpf_class offsetY, RenderTexture2D mandelbrotTexture, ArbVector2 *renderOffset) {
+ArbVector2 arbOffsetControls(mpf_class offsetX, mpf_class offsetY) {
     ArbVector2 returnVal = {offsetX, offsetY};
     movingRightNow = false;
     mpf_class speed = 1.0;
@@ -384,11 +398,6 @@ int main(void) {
     // Increase default precision for GMP
     mpf_set_default_prec(256);
 
-    SuperVector2 offset = {0, 0};
-    SuperVector2 renderOffset = {0, 0};
-    ArbVector2 arbOffset = {0, 0};
-    ArbVector2 arbRenderOffset = {0, 0};
-
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1200, 700, "Mandelbrot");
 
@@ -437,9 +446,9 @@ int main(void) {
         lastFrameWasArb = usingArbitraryPrecisionLibrary;
 
 
-        if (canMove) {
+        if (canMove && !usingMouseDragging) {
             if (usingArbitraryPrecisionLibrary) {
-                 arbOffset = arbOffsetControls(arbOffset.x, arbOffset.y, mandelbrotTexture, &arbRenderOffset);
+                 arbOffset = arbOffsetControls(arbOffset.x, arbOffset.y);
                  
                  if (IsKeyDown(KEY_M)) {
                     arbZoomFactor += arbZoomFactor / longDoubleToMpf(zoomSpeed);
@@ -464,9 +473,7 @@ int main(void) {
                 }
 
             } else {
-
-
-                offset = offsetControls(offset.x, offset.y, mandelbrotTexture, &renderOffset);
+                offset = offsetControls(offset.x, offset.y);
                 
                 if (IsKeyDown(KEY_M)) {
                     zoomFactor += zoomFactor / zoomSpeed;
@@ -491,11 +498,47 @@ int main(void) {
                     oldZoomFactor = zoomFactor;
                     needsRedraw = true;
                 }
+
             }
         }
-    
+        
+        if (canMove && usingMouseDragging) {
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                oldOffset = offset;
+                dragStartPos = GetMousePosition();
+                draggingMouse = true;
+            }
 
-        if (needsRedraw && !movingRightNow) {
+            if (draggingMouse && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+                dragEndPos = GetMousePosition();
+                offset.x = oldOffset.x + (dragStartPos.x - dragEndPos.x);
+                offset.y = oldOffset.y + (dragStartPos.y - dragEndPos.y);
+                movingRightNow = true;
+            }
+
+            if (draggingMouse && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+                dragEndPos = GetMousePosition();
+                offset.x = oldOffset.x + (dragStartPos.x - dragEndPos.x);
+                offset.y = oldOffset.y + (dragStartPos.y - dragEndPos.y);
+                draggingMouse = false;
+                movingRightNow = false;
+                needsRedraw = true;
+            }
+        }
+
+        if (movingRightNow && timerInUse) {
+            timerInUse = false;
+        }
+
+        if (needsRedraw && !movingRightNow && !timerInUse) {
+            timer = 2.0f;
+            timerInUse = true;
+        } else if (needsRedraw && !movingRightNow && timerInUse && (timer > 0)) {
+            timer -= GetFrameTime();
+            if (timer < 0) {
+                timer = 0.0f;
+            }
+        } else if (needsRedraw && !movingRightNow && timerInUse && (timer <= 0)) {
             canMove = false;
             if (usingArbitraryPrecisionLibrary) {
                 renderMandelbrotToTextureArbitraryPrecsion(mandelbrotTexture, arbOffset.x, arbOffset.y);
@@ -762,13 +805,13 @@ int main(void) {
                 }
             }
 
-            DrawText("Detail level", 20 + moreInfoOffset, 270, 20, WHITE);
+            DrawText("Detail level", 20 + moreInfoOffset, 275, 20, WHITE);
             std::vector<Rectangle> detailLevelBoxes = {
-                {15 + moreInfoOffset, 295, 30, 30},
-                {50 + moreInfoOffset, 295, 30, 30},
-                {85 + moreInfoOffset, 295, 30, 30},
-                {120 + moreInfoOffset, 295, 30, 30},
-                {155 + moreInfoOffset, 295, 30, 30}
+                {15 + moreInfoOffset, 300, 30, 30},
+                {50 + moreInfoOffset, 300, 30, 30},
+                {85 + moreInfoOffset, 300, 30, 30},
+                {120 + moreInfoOffset, 300, 30, 30},
+                {155 + moreInfoOffset, 300, 30, 30}
             };
             for (int i = 0; i < detailLevelBoxes.size(); i++) {
                 if (detailLevelUsed == i) {
@@ -780,6 +823,7 @@ int main(void) {
             }
 
 
+            DrawText(TextFormat("Timer: %s", truncateZeroes(timer, 3).c_str()), 20 + moreInfoOffset, 335, 20, WHITE);
         }
         
 
