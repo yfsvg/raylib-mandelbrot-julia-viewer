@@ -9,6 +9,14 @@
 
 #include "ui_types.hpp"
 
-void drawFPSRegular(long double zoomFactor, SuperVector2 offset, float moreInfoOffset);
+void drawPosition(bool usingArbitraryPrecisionLibrary, long double zoomFactor, SuperVector2 offset, float moreInfoOffset, ArbVector2 arbOffset, mpf_class arbZoomFactor);
+void drawCheckbox(bool& variableToChange, float moreInfoOffset, float x, float y, float sizeX, float sizeY, std::string textWithBox, float margins);
+
+void drawTextInput( float moreInfoOffset, float x, float y, float sizeX, float sizeY,
+                    bool& editingCurrentVariable, bool& editingOV1, bool& editingOV2,
+                    char inputText[6], std::string queryText, bool& needsRedraw,
+                    int variableToChange
+);
+
 
 #endif
