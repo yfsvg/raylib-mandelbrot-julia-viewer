@@ -55,41 +55,43 @@ void drawCheckbox(bool& variableToChange, float moreInfoOffset, float x, float y
     }
 }
 
-void drawTextInput( float moreInfoOffset, float x, float y, float sizeX, float sizeY,
+void drawTextInput(float moreInfoOffset, float x, float y, float sizeX, float sizeY,
                     bool& editingCurrentVariable, bool& editingOV1, bool& editingOV2,
-                    char inputText[6], std::string queryText, bool& needsRedraw,
-                    int variableToChange
+                    std::string& inputText, std::string& queryText, bool& needsRedraw,
+                    int& variableToChange
 ) {
-    int lengthInput;
-
     Rectangle detailInputBox = { x + moreInfoOffset, y, sizeX, sizeY };
-    if (editingCurrentVariable) {
-        DrawRectangleRec(detailInputBox, Fade(WHITE, 0.3f));
-    } else {
-        DrawRectangleRec(detailInputBox, Fade(WHITE, 0.1f));
-    }
+
+    DrawRectangleRec(detailInputBox, Fade(WHITE, editingCurrentVariable ? 0.3f : 0.1f));
     DrawRectangleLinesEx(detailInputBox, 1, Fade(WHITE, 0.5f));
-    DrawText(inputText, 20 + moreInfoOffset, y + 5, 20, WHITE);
+
+    DrawText(inputText.c_str(), 20 + moreInfoOffset, y + 5, 20, WHITE);
     DrawText(queryText.c_str(), 125 + moreInfoOffset, y + 5, 20, WHITE);
-    if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+
+    if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) &&
+        IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         editingCurrentVariable = true;
         editingOV1 = false;
         editingOV2 = false;
     }
+
     if (editingCurrentVariable) {
         int key = GetCharPressed();
-        lengthInput = strlen(inputText);
-        if (key >= '0' && key <= '9' && lengthInput < 5) {
-            inputText[lengthInput] = (char)key;
-            inputText[lengthInput + 1] = '\0';
+
+        if (key >= '0' && key <= '9' && inputText.length() < 4) {
+            inputText.push_back((char)key);
         }
-        if (IsKeyPressed(KEY_BACKSPACE) && lengthInput > 0) {
-            inputText[lengthInput - 1] = '\0';
+
+        if (IsKeyPressed(KEY_BACKSPACE) && !inputText.empty()) {
+            inputText.pop_back();
         }
+
         if (IsKeyPressed(KEY_ENTER)) {
-            variableToChange = atoi(inputText);
-            needsRedraw = true;
+            if (!inputText.empty()) {
+                variableToChange = std::stoi(inputText);
+                needsRedraw = true;
+            }
             editingCurrentVariable = false;
         }
-    }   
+    }
 }

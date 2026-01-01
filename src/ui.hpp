@@ -15,7 +15,13 @@ void drawCheckbox(bool& variableToChange, float moreInfoOffset, float x, float y
 void drawTextInput( float moreInfoOffset, float x, float y, float sizeX, float sizeY,
                     bool& editingCurrentVariable, bool& editingOV1, bool& editingOV2,
                     char inputText[6], std::string queryText, bool& needsRedraw,
-                    int variableToChange
+                    int& variableToChange
+);
+
+void drawTextInputLongDouble( float moreInfoOffset, float x, float y, float sizeX, float sizeY,
+                    bool& editingCurrentVariable, bool& editingOV1, bool& editingOV2,
+                    char inputText[6], std::string queryText, bool& needsRedraw,
+                    long double& variableToChange
 );
 
 

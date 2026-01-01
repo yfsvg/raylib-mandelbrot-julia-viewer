@@ -51,8 +51,7 @@ bool editingDetail = false;
 char detailInputText[6] = "250";
 
 bool editingZoomSpeed = false;
-char zoomSpeedInputText[6] = "50";
-long double zoomSpeed = 50;
+long double zoomSpeed = 50; // fixed constant behavior; UI removed
 
 bool usingBoxZoom = false;
 
@@ -477,6 +476,7 @@ int main(void) {
         }
         
         if (canMove && usingMouseDragging) {
+            movingRightNow = false;
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 oldOffset = offset;
                 dragStartPos = GetMousePosition();
@@ -495,17 +495,29 @@ int main(void) {
                 offset.x = oldOffset.x + (dragStartPos.x - dragEndPos.x);
                 offset.y = oldOffset.y + (dragStartPos.y - dragEndPos.y);
                 draggingMouse = false;
-                movingRightNow = false;
+            }
+
+            if (IsKeyDown(KEY_M)) {
+                zoomFactor += zoomFactor / zoomSpeed;
+                movingRightNow = true;
+            }
+            if (IsKeyDown(KEY_N)) {
+                zoomFactor -= zoomFactor / zoomSpeed;
+                movingRightNow = true;
+            }
+
+            if (wasMovingLastFrame && !movingRightNow) {
+                if (fabsl(zoomFactor - previousZoom) > 0.01L) {
+                    offset.x = offset.x * (zoomFactor / previousZoom);
+                    offset.y = offset.y * (zoomFactor / previousZoom);
+                    previousZoom = zoomFactor;
+                }
+                oldZoomFactor = zoomFactor;
+                // if the distance is too small, dont redraw and reset back to original
                 needsRedraw = true;
             }
 
         }
-
-
-        float mouseWheelMovement = GetMouseWheelMove();
-        char buffer[32];
-        snprintf(buffer, sizeof(buffer), "%.2f", mouseWheelMovement);
-        DrawText(buffer, 15, 310, 20, WHITE);
 
         if (needsRedraw && !movingRightNow) {
             canMove = false;
@@ -587,7 +599,6 @@ int main(void) {
         DrawRectangleRec(collapseButton, Fade(BLACK, 0.8f));
         DrawRectangleLinesEx(collapseButton, 1, Fade(WHITE, 0.5f));
         if (CheckCollisionPointRec(GetMousePosition(), collapseButton) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            editingZoomSpeed = true;
             editingDetail = false;
             editingThreadCount = false;
             toggledMoreInfo = !toggledMoreInfo;
@@ -602,16 +613,12 @@ int main(void) {
         drawPosition(usingArbitraryPrecisionLibrary, zoomFactor, offset, moreInfoOffset, arbOffset, arbZoomFactor);
 
         int lengthInput;
-        // Iteration amount input area
         drawTextInput(moreInfoOffset, 15, 100, 100, 30,
                 editingDetail, editingZoomSpeed, editingThreadCount,
                 detailInputText, "Iterations", needsRedraw,
                 detailAmt);
 
-        drawTextInput(moreInfoOffset, 15, 135, 100, 30,
-                editingZoomSpeed, editingDetail, editingThreadCount,
-                zoomSpeedInputText, "Zoom speed", needsRedraw,
-                zoomSpeed);
+        // Zoom speed is fixed at 50 (no UI to change it)
 
         drawCheckbox(usingArbitraryPrecisionLibrary, moreInfoOffset, 15, 170, 30, 30, "Arbitrary Precision", 5);
 
@@ -641,8 +648,6 @@ int main(void) {
             }
             DrawRectangleLinesEx(detailLevelBoxes[i], 1, Fade(WHITE, 0.5f));
         }
-        
-        
         
 
         EndDrawing();
