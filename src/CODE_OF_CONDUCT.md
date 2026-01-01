@@ -1,0 +1,1 @@
+Refrain from being an asshat
