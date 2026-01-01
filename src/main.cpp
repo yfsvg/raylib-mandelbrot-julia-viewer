@@ -48,7 +48,7 @@ bool toggledMoreInfo = true;
 float moreInfoOffset = 0;
 
 bool editingDetail = false;
-char detailInputText[6] = "250";
+std::string detailInputText = "250";
 
 bool editingZoomSpeed = false;
 long double zoomSpeed = 50; // fixed constant behavior; UI removed
@@ -61,12 +61,13 @@ char threadCountInputText[6] = "4";
 
 bool usingArbitraryPrecisionLibrary = false;
 
-int detailLevelUsed = 4;
-
-bool usingMouseDragging = true;
+bool usingWASD = true;
 bool draggingMouse = false;
 Vector2 dragStartPos = { 0, 0 };
 Vector2 dragEndPos = { 0, 0 };
+
+bool usingLDM = false;
+bool usingULDM = false;
 
 
 
@@ -126,8 +127,17 @@ std::vector<Color> relativeEscapeValueColors;
 void giveMandelbrotOutputsInRange(int startX, int endX, int setWidth, int setHeight, long double centerReal, long double centerImag, std::vector<int>& returnVector) {
     // performance smiling
     returnVector.reserve((endX - startX) * setHeight);
-    for (int x = startX; x < endX; x++) {
-        for (int y = 0; y < setHeight; y++) {
+
+    int addAmt = 1;
+
+    if (usingULDM) {
+        addAmt = 4;
+    } else if (usingLDM) {
+        addAmt = 2;
+    }
+
+    for (int x = startX; x < endX; x += addAmt) {
+        for (int y = 0; y < setHeight; y += addAmt) {
             // converting 0-based screen coordinates because the function demands actual mathematical coords
             long double real = centerReal + ((x - setWidth/2.0) / zoomFactor);
             long double imag = centerImag + ((y - setHeight/2.0) / zoomFactor);
@@ -141,10 +151,18 @@ void giveMandelbrotOutputsInRangeGMP(int startX, int endX, int setWidth, int set
     
     mpf_class real, imag;
     mpf_class step = 1.0 / arbZoomFactor; // Pre-calc step to save divisions
+
+    int addAmt = 1;
+
+    if (usingULDM) {
+        addAmt = 4;
+    } else if (usingLDM) {
+        addAmt = 2;
+    }
     
-    for (int x = startX; x < endX; x++) {
+    for (int x = startX; x < endX; x += addAmt) {
         real = centerReal + (x - setWidth/2.0) * step;
-        for (int y = 0; y < setHeight; y++) {
+        for (int y = 0; y < setHeight; y += addAmt) {
             imag = centerImag + (y - setHeight/2.0) * step;
             returnVector.push_back(isInMandlebrotGMP(real, imag));
         }
@@ -156,7 +174,6 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     int setWidth = mandieSet.texture.width;
     int setHeight = mandieSet.texture.height;
 
-    // Calculating the center in complex world using local coordinates
     long double centerReal = offsetX / zoomFactor;
     long double centerImag = offsetY / zoomFactor;
 
@@ -203,14 +220,15 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
         }
     }
 
-    // Calculate colors based on escape values (HSV mapping)
+    // calculate colors based on escape values
     for (int val : allEscapeValues) {
         if (val == -1) {
             relativeEscapeValueColors.push_back(BLACK);
         } else {
             float range = (float)(maximumEscapeIterations - minimumEscapeIterations);
-            if (range == 0) range = 1.0f;
-
+            if (range == 0) {
+                range = 1.0f;
+            }
 
             float t = (float)(val - minimumEscapeIterations) / range;
             relativeEscapeValueColors.push_back(ColorFromHSV(t * 360.0f, 1.0f, 1.0f));
@@ -221,13 +239,22 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     BeginTextureMode(mandieSet);
     ClearBackground(RAYWHITE);
 
+    int addAmt = 1;
+
+    if (usingULDM) {
+        addAmt = 4;
+    } else if (usingLDM) {
+        addAmt = 2;
+    }
+
     int idx = 0;
-    for (int x = 0; x < setWidth; x++) {
-        for (int y = 0; y < setHeight; y++) {
+    for (int x = 0; x < setWidth; x += addAmt) {
+        for (int y = 0; y < setHeight; y += addAmt) {
             if (idx < (int)relativeEscapeValueColors.size()) {
-                DrawRectangle(x, y, 1, 1, relativeEscapeValueColors[idx++]);
+                DrawRectangle(x, y, addAmt, addAmt, relativeEscapeValueColors[idx++]);
             }
         }
+
     }
 
     EndTextureMode();
@@ -297,11 +324,20 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
 
     BeginTextureMode(mandieSet);
     ClearBackground(RAYWHITE);
+
+    int addAmt = 1;
+
+    if (usingULDM) {
+        addAmt = 4;
+    } else if (usingLDM) {
+        addAmt = 2;
+    }
+
     int idx = 0;
-    for (int x = 0; x < setWidth; x++) {
-        for (int y = 0; y < setHeight; y++) {
+    for (int x = 0; x < setWidth; x += addAmt) {
+        for (int y = 0; y < setHeight; y += addAmt) {
             if (idx < relativeEscapeValueColors.size()) {
-                DrawRectangle(x, y, 1, 1, relativeEscapeValueColors[idx++]);
+                DrawRectangle(x, y, addAmt, addAmt, relativeEscapeValueColors[idx++]);
             }
         }
     }
@@ -419,7 +455,7 @@ int main(void) {
         lastFrameWasArb = usingArbitraryPrecisionLibrary;
 
 
-        if (canMove && !usingMouseDragging) {
+        if (canMove && usingWASD) {
             if (usingArbitraryPrecisionLibrary) {
                  arbOffset = arbOffsetControls(arbOffset.x, arbOffset.y);
                  
@@ -475,7 +511,8 @@ int main(void) {
             }
         }
         
-        if (canMove && usingMouseDragging) {
+        
+        if (canMove && !usingWASD) {
             movingRightNow = false;
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 oldOffset = offset;
@@ -514,8 +551,14 @@ int main(void) {
                 }
                 oldZoomFactor = zoomFactor;
                 // if the distance is too small, dont redraw and reset back to original
-                needsRedraw = true;
+                if (std::abs(dragStartPos.x - dragEndPos.x) < 3 && std::abs(dragStartPos.y - dragEndPos.y) < 3) {
+                    offset = oldOffset;
+                } else {
+                    needsRedraw = true;
+                }
+                
             }
+            
 
         }
 
@@ -605,6 +648,7 @@ int main(void) {
         }
 
 
+
         
 
 
@@ -620,34 +664,21 @@ int main(void) {
 
         // Zoom speed is fixed at 50 (no UI to change it)
 
-        drawCheckbox(usingArbitraryPrecisionLibrary, moreInfoOffset, 15, 170, 30, 30, "Arbitrary Precision", 5);
+        drawCheckbox(usingArbitraryPrecisionLibrary, moreInfoOffset, 15, 135, 30, 30, "Arbitrary Precision", 5);
 
-        drawCheckbox(usingBoxZoom, moreInfoOffset, 15, 205, 30, 30, "Use box zoom", 5);
+        drawCheckbox(usingBoxZoom, moreInfoOffset, 15, 170, 30, 30, "Use box zoom", 5);
 
-        char threadStr[6];
-        snprintf(threadStr, sizeof(threadStr), "%d", threadz);
-        drawTextInput(moreInfoOffset, 15, 240, 100, 30,
-                    editingThreadCount, editingDetail, editingZoomSpeed,
-                    threadStr, "Threads", needsRedraw,
-                    threadz);
+        std::string fsdof = std::to_string(threadz);
+        drawTextInput(moreInfoOffset, 15, 205, 100, 30,
+                editingThreadCount, editingDetail, editingZoomSpeed,
+                fsdof, "Threads", needsRedraw,
+                threadz);
         
+        drawCheckbox(usingLDM, moreInfoOffset, 15, 240, 30, 30, "Low Detail Mode", 5);
+        drawCheckbox(usingULDM, moreInfoOffset, 15, 275, 30, 30, "Ultra LDM", 5);
 
-        DrawText("Detail level", 20 + moreInfoOffset, 275, 20, WHITE);
-        std::vector<Rectangle> detailLevelBoxes = {
-            {15 + moreInfoOffset, 300, 30, 30},
-            {50 + moreInfoOffset, 300, 30, 30},
-            {85 + moreInfoOffset, 300, 30, 30},
-            {120 + moreInfoOffset, 300, 30, 30},
-            {155 + moreInfoOffset, 300, 30, 30}
-        };
-        for (int i = 0; i < detailLevelBoxes.size(); i++) {
-            if (detailLevelUsed == i) {
-                DrawRectangleRec(detailLevelBoxes[i], Fade(WHITE, 0.3f));
-            } else {
-                DrawRectangleRec(detailLevelBoxes[i], Fade(WHITE, 0.1f));
-            }
-            DrawRectangleLinesEx(detailLevelBoxes[i], 1, Fade(WHITE, 0.5f));
-        }
+        drawCheckbox(usingWASD, moreInfoOffset, 15, 310, 30, 30, "Using WASD", 5);
+
         
 
         EndDrawing();

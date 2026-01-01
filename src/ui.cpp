@@ -57,7 +57,7 @@ void drawCheckbox(bool& variableToChange, float moreInfoOffset, float x, float y
 
 void drawTextInput(float moreInfoOffset, float x, float y, float sizeX, float sizeY,
                     bool& editingCurrentVariable, bool& editingOV1, bool& editingOV2,
-                    std::string& inputText, std::string& queryText, bool& needsRedraw,
+                    std::string& inputText, std::string queryText, bool& needsRedraw,
                     int& variableToChange
 ) {
     Rectangle detailInputBox = { x + moreInfoOffset, y, sizeX, sizeY };
