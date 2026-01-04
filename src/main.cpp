@@ -51,7 +51,7 @@ bool editingDetail = false;
 std::string detailInputText = "250";
 
 bool editingZoomSpeed = false;
-long double zoomSpeed = 50; // fixed constant behavior; UI removed
+long double zoomSpeed = 50;
 
 bool usingBoxZoom = false;
 
@@ -688,3 +688,4 @@ int main(void) {
     CloseWindow();
     return 0;
 }
+
