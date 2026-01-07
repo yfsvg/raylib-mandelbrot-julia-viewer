@@ -19,6 +19,7 @@
 
 #include "ui_types.hpp"
 #include "ui.hpp"
+#include "renderBrot.hpp"
 
 #include "raylib.h"
 #include "raymath.h"
@@ -124,28 +125,6 @@ int isInMandlebrotGMP(mpf_class cReal, mpf_class cImag) {
 std::vector<int> allEscapeValues;
 std::vector<Color> relativeEscapeValueColors;
 
-void giveMandelbrotOutputsInRange(int startX, int endX, int setWidth, int setHeight, long double centerReal, long double centerImag, std::vector<int>& returnVector) {
-    // performance smiling
-    returnVector.reserve((endX - startX) * setHeight);
-
-    int addAmt = 1;
-
-    if (usingULDM) {
-        addAmt = 4;
-    } else if (usingLDM) {
-        addAmt = 2;
-    }
-
-    for (int x = startX; x < endX; x += addAmt) {
-        for (int y = 0; y < setHeight; y += addAmt) {
-            // converting 0-based screen coordinates because the function demands actual mathematical coords
-            long double real = centerReal + ((x - setWidth/2.0) / zoomFactor);
-            long double imag = centerImag + ((y - setHeight/2.0) / zoomFactor);
-            returnVector.push_back(isInMandlebrotButGiveIterationsToEscape(std::complex<long double>(real, imag)));
-        }
-    }
-}
-
 void giveMandelbrotOutputsInRangeGMP(int startX, int endX, int setWidth, int setHeight, mpf_class centerReal, mpf_class centerImag, std::vector<int>& returnVector) {
     returnVector.reserve((endX - startX) * setHeight);
     
@@ -174,66 +153,7 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     int setWidth = mandieSet.texture.width;
     int setHeight = mandieSet.texture.height;
 
-    long double centerReal = offsetX / zoomFactor;
-    long double centerImag = offsetY / zoomFactor;
-
-    allEscapeValues.clear();
-    relativeEscapeValueColors.clear();
-
-    // Multi-threading setup
-    std::vector<std::vector<int>> tLists(threadz);
-    int stripWidth = setWidth / threadz;
-    std::vector<std::thread> threadsList;
-
-    for (int i = 0; i < threadz; i++) {
-        threadsList.push_back(std::thread([&, i]() {
-            int endPosition;
-            if (i == threadz - 1) {
-                endPosition = setWidth;
-            } else {
-                endPosition = stripWidth * (i + 1);
-            }
-
-            giveMandelbrotOutputsInRange(stripWidth * i, endPosition, setWidth, setHeight, centerReal, centerImag, tLists[i]);
-        }));
-    }
-
-    for (int i = 0; i < threadsList.size(); i++) {
-        threadsList[i].join();
-    }
-
-    for (int i = 0; i < tLists.size(); i++) {
-        allEscapeValues.insert(allEscapeValues.end(), tLists[i].begin(), tLists[i].end());
-    }
-
-    int minimumEscapeIterations = INT_MAX;
-    int maximumEscapeIterations = INT_MIN;
-
-    for (size_t i = 0; i < allEscapeValues.size(); i++) {
-        if (allEscapeValues[i] != -1) {
-            if (allEscapeValues[i] < minimumEscapeIterations) {
-                minimumEscapeIterations = allEscapeValues[i];
-            }
-            if (allEscapeValues[i] > maximumEscapeIterations) {
-                maximumEscapeIterations = allEscapeValues[i];
-            }
-        }
-    }
-
-    // calculate colors based on escape values
-    for (int val : allEscapeValues) {
-        if (val == -1) {
-            relativeEscapeValueColors.push_back(BLACK);
-        } else {
-            float range = (float)(maximumEscapeIterations - minimumEscapeIterations);
-            if (range == 0) {
-                range = 1.0f;
-            }
-
-            float t = (float)(val - minimumEscapeIterations) / range;
-            relativeEscapeValueColors.push_back(ColorFromHSV(t * 360.0f, 1.0f, 1.0f));
-        }
-    }
+    relativeEscapeValueColors = calculateEscapeValues(mandieSet, offsetX, offsetY, threadz, zoomFactor, usingULDM, usingLDM, detailAmt);
 
     // Draw the resulting colors to the texture
     BeginTextureMode(mandieSet);
