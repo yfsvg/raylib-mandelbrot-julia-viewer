@@ -23,6 +23,8 @@ p {
     font-family: "Outfit", sans-serif;
     font-optical-sizing: auto;
     font-weight: 350;
+
+    margin-bottom: 15px;
 }
 
 .smallText {
@@ -75,7 +77,6 @@ p {
     box-sizing: border-box;
 }
 
-/* Minimal fixed viewer bar */
 #viewerBar {
     position: fixed;
     top: 0;

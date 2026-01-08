@@ -79,74 +79,10 @@ void drawIntercepts(long double offsetX, long double offsetY) {
     DrawRectangle(0, GetScreenHeight() / 2 - 1 - (float) offsetY, GetScreenWidth(), 2, RED);
 }
 
-
-// Exact same code as above, HOWEVER, it returns the amount of iterations needed to escape.
-// If it doesn't escape with the given detailAmt, then it's marked as -1
-int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c) {
-    std::complex<long double> z(0.0L, 0.0L);
-    std::complex<long double> z_old(0.0L, 0.0L);
-    int period = 0;
-    for (int i = 0; i < detailAmt; i++) {
-        z = z * z + c;
-        if (std::abs(z) > 2.0L) {
-            return i + 1;
-        }
-        if (i == period) {
-            if (std::abs(z - z_old) < 1e-10L) {
-                return -1;
-            }
-            z_old = z;
-            period = i;
-        }
-    }
-    return -1;
-}
-
-int isInMandlebrotGMP(mpf_class cReal, mpf_class cImag) {
-    mpf_class zReal = 0, zImag = 0;
-    mpf_class z_r_sq = 0, z_i_sq = 0, temp;
-    
-    // Periodicity checking ended up being slower than just ignoring it
-    for (int i = 0; i < detailAmt; i++) {
-        temp = z_r_sq - z_i_sq + cReal;
-        zImag = 2 * zReal * zImag + cImag;
-        zReal = temp;
-        
-        z_r_sq = zReal * zReal;
-        z_i_sq = zImag * zImag;
-        
-        if (z_r_sq + z_i_sq > 4.0) {
-            return i + 1;
-        }
-    }
-    return -1;
-}
-
 std::vector<int> allEscapeValues;
 std::vector<Color> relativeEscapeValueColors;
 
-void giveMandelbrotOutputsInRangeGMP(int startX, int endX, int setWidth, int setHeight, mpf_class centerReal, mpf_class centerImag, std::vector<int>& returnVector) {
-    returnVector.reserve((endX - startX) * setHeight);
-    
-    mpf_class real, imag;
-    mpf_class step = 1.0 / arbZoomFactor; // Pre-calc step to save divisions
-
-    int addAmt = 1;
-
-    if (usingULDM) {
-        addAmt = 4;
-    } else if (usingLDM) {
-        addAmt = 2;
-    }
-    
-    for (int x = startX; x < endX; x += addAmt) {
-        real = centerReal + (x - setWidth/2.0) * step;
-        for (int y = 0; y < setHeight; y += addAmt) {
-            imag = centerImag + (y - setHeight/2.0) * step;
-            returnVector.push_back(isInMandlebrotGMP(real, imag));
-        }
-    }
-}
+// Rendering, regular
 
 void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, long double offsetY) {
     // Only begin texture mode when we are actually ready to draw
@@ -180,6 +116,7 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     EndTextureMode();
 }
 
+// Rendering, arbitrary position library
 
 void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_class offsetX, mpf_class offsetY) {
     int setWidth = mandieSet.texture.width;
@@ -191,56 +128,7 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
     allEscapeValues.clear();
     relativeEscapeValueColors.clear();
 
-    std::vector<std::vector<int>> tLists(threadz);
-    int stripWidth = setWidth / threadz;
-
-    std::vector<std::thread> threadsList;
-    for (int i = 0; i < threadz; i++) {
-        threadsList.push_back(std::thread([&, i]() { 
-            int endPosition;
-            if (i == threadz - 1) {
-                endPosition = setWidth;
-            } else {
-                endPosition = stripWidth * (i + 1);
-            }
-            giveMandelbrotOutputsInRangeGMP(stripWidth * i, endPosition, setWidth, setHeight, centerReal, centerImag, tLists[i]); 
-        }));
-    }
-
-    for (int i = 0; i < threadsList.size(); i++) {
-        threadsList[i].join();
-    }
-
-    for (int i = 0; i < tLists.size(); i++) {
-        allEscapeValues.insert(allEscapeValues.end(), tLists[i].begin(), tLists[i].end());
-    }
-
-    // reusing coloring logic (identical to float version)
-    int minimumEscapeIterations = INT_MAX;
-    int maximumEscapeIterations = INT_MIN;
-    for (size_t i = 0; i < allEscapeValues.size(); i++) {
-        if (allEscapeValues[i] != -1) {
-            if (allEscapeValues[i] < minimumEscapeIterations) {
-                minimumEscapeIterations = allEscapeValues[i];
-            }
-            if (allEscapeValues[i] > maximumEscapeIterations) {
-                maximumEscapeIterations = allEscapeValues[i];
-            }
-        }
-    }
-
-    for (int val : allEscapeValues) {
-        if (val == -1) {
-            relativeEscapeValueColors.push_back(BLACK);
-        } else {
-            float range = (float) (maximumEscapeIterations - minimumEscapeIterations);
-            if (range == 0) {
-                range = 1.0f; 
-            }
-            float t = (float) (val - minimumEscapeIterations) / range;
-            relativeEscapeValueColors.push_back(ColorFromHSV(t * 360.0f, 1.0f, 1.0f));
-        }
-    }
+    relativeEscapeValueColors = calculateEscapeValuesForArbs(mandieSet, offsetX, offsetY, threadz, arbZoomFactor, usingULDM, usingLDM, detailAmt);
 
     BeginTextureMode(mandieSet);
     ClearBackground(RAYWHITE);
@@ -264,6 +152,12 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
     EndTextureMode();
 }
 
+
+
+
+
+
+// Movement, regular
 
 SuperVector2 offsetControls(long double offsetX, long double offsetY) {
     SuperVector2 returnVal = {offsetX, offsetY};
@@ -289,6 +183,8 @@ SuperVector2 offsetControls(long double offsetX, long double offsetY) {
     
     return returnVal;
 }
+
+// Movement, arbitrary precision
 
 ArbVector2 arbOffsetControls(mpf_class offsetX, mpf_class offsetY) {
     ArbVector2 returnVal = {offsetX, offsetY};
@@ -323,12 +219,13 @@ mpf_class longDoubleToMpf(long double toTurn) {
     return mpf_class(e);
 }
 
+// Main loop
+
 int main(void) {
-    // Increase default precision for GMP
     mpf_set_default_prec(256);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(1200, 700, "Mandelbrot");
+    InitWindow(1000, 600, "Mandelbrot");
 
 
     // miss mandie
@@ -383,6 +280,7 @@ int main(void) {
                     arbZoomFactor += arbZoomFactor / longDoubleToMpf(zoomSpeed);
                     movingRightNow = true;
                 }
+
                 if (IsKeyDown(KEY_N)) {
                     arbZoomFactor -= arbZoomFactor / longDoubleToMpf(zoomSpeed);
                     movingRightNow = true;
@@ -570,7 +468,7 @@ int main(void) {
 
 
         
-
+        // UI
 
         DrawFPS(15 + moreInfoOffset, 15);
         
@@ -608,4 +506,3 @@ int main(void) {
     CloseWindow();
     return 0;
 }
-

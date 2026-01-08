@@ -15,4 +15,8 @@ int isInMandlebrotButGiveIterationsToEscape(std::complex<long double> c, int det
 void giveMandelbrotOutputsInRange(int startX, int endX, int setWidth, int setHeight, long double centerReal, long double centerImag, std::vector<int>& returnVector, long double zoomFactor, bool usingULDM, bool usingLDM, int detailAmt);
 std::vector<Color> calculateEscapeValues(RenderTexture2D mandieSet, long double offsetX, long double offsetY, int threadz, long double zoomFactor, bool usingULDM, bool usingLDM, int detailAmt);
 
+int isInMandlebrotGMP(mpf_class cReal, mpf_class cImag, int detailAmt);
+void giveMandelbrotOutputsInRangeGMP(int startX, int endX, int setWidth, int setHeight, mpf_class centerReal, mpf_class centerImag, std::vector<int>& returnVector, mpf_class arbZoomFactor, bool usingULDM, bool usingLDM, int detailAmt);
+std::vector<Color> calculateEscapeValuesForArbs(RenderTexture2D mandieSet, mpf_class offsetX, mpf_class offsetY, int threadz, mpf_class arbZoomFactor, bool usingULDM, bool usingLDM, int detailAmt);
+
 #endif
