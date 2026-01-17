@@ -20,6 +20,12 @@ void drawTextInput(float moreInfoOffset, float x, float y, float sizeX, float si
                     int& variableToChange
 );
 
+void drawTextInputDouble(float moreInfoOffset, float x, float y, float sizeX, float sizeY,
+                    bool& editingCurrentVariable, std::vector<bool*> allEditingStates,
+                    std::string& inputText, std::string queryText, bool& needsRedraw,
+                    long double& variableToChange
+);
+
 // void drawPopup(std::string bigText, std::string smallText, std::string acceptanceText);
 
 #endif

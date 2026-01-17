@@ -114,3 +114,56 @@ void drawPopup(std::string bigText, std::string smallText, std::string acceptanc
     DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
     DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
 }
+
+void drawTextInputDouble(float moreInfoOffset, float x, float y, float sizeX, float sizeY,
+                    bool& editingCurrentVariable, std::vector<bool*> allEditingStates,
+                    std::string& inputText, std::string queryText, bool& needsRedraw,
+                    long double& variableToChange
+) {
+    Rectangle detailInputBox = { x + moreInfoOffset, y, sizeX, sizeY };
+
+    DrawRectangleRec(detailInputBox, Fade(WHITE, editingCurrentVariable ? 0.3f : 0.1f));
+    DrawRectangleLinesEx(detailInputBox, 1, Fade(WHITE, 0.5f));
+
+    DrawText(inputText.c_str(), 20 + moreInfoOffset, y + 5, 20, WHITE);
+    DrawText(queryText.c_str(), 125 + moreInfoOffset, y + 5, 20, WHITE);
+
+    if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) &&
+        IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        deselectAllTextInputs(allEditingStates, &editingCurrentVariable);
+    }
+
+    if (editingCurrentVariable && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && 
+        !CheckCollisionPointRec(GetMousePosition(), detailInputBox)) {
+        editingCurrentVariable = false;
+    }
+
+    if (editingCurrentVariable) {
+        int key = GetCharPressed();
+
+        // Allow digits, decimal point, and minus sign
+        if ((key >= '0' && key <= '9') && inputText.length() < 10) {
+            inputText.push_back((char)key);
+        } else if (key == '.' && inputText.find('.') == std::string::npos && inputText.length() < 10) {
+            inputText.push_back('.');
+        } else if (key == '-' && inputText.length() == 0) {
+            inputText.push_back('-');
+        }
+
+        if (IsKeyPressed(KEY_BACKSPACE) && !inputText.empty()) {
+            inputText.pop_back();
+        }
+
+        if (IsKeyPressed(KEY_ENTER)) {
+            if (!inputText.empty() && inputText != "-") {
+                try {
+                    variableToChange = std::stold(inputText);
+                    needsRedraw = true;
+                } catch (...) {
+                    // invalid number
+                }
+            }
+            editingCurrentVariable = false;
+        }
+    }
+}

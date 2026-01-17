@@ -70,6 +70,18 @@ int sensitivity = 5;
 std::string sensitivityInputText = "5";
 bool editingSensitivity = false;
 
+bool showJuliaSet = false;
+long double juliaReal = 0.0L;
+long double juliaImag = 0.0L;
+long double juliaPower = 2.0L;
+
+bool editingJuliaReal = false;
+bool editingJuliaImag = false;
+bool editingJuliaPower = false;
+
+std::string juliaRealInputText = "0.0";
+std::string juliaImagInputText = "0.0";
+std::string juliaPowerInputText = "2.0";
 
 
 // rectangle zoom relocated to main
@@ -89,7 +101,12 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
     int setWidth = mandieSet.texture.width;
     int setHeight = mandieSet.texture.height;
 
-    relativeEscapeValueColors = calculateEscapeValues(mandieSet, offsetX, offsetY, threadz, zoomFactor, usingULDM, usingLDM, detailAmt);
+    if (showJuliaSet) {
+        std::complex<long double> juliaSeed(juliaReal, juliaImag);
+        relativeEscapeValueColors = calculateEscapeValuesJulia(mandieSet, offsetX, offsetY, threadz, zoomFactor, juliaSeed, juliaPower, usingULDM, usingLDM, detailAmt);
+    } else {
+        relativeEscapeValueColors = calculateEscapeValues(mandieSet, offsetX, offsetY, threadz, zoomFactor, usingULDM, usingLDM, detailAmt);
+    }
 
     // Draw the resulting colors to the texture
     BeginTextureMode(mandieSet);
@@ -163,7 +180,7 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
 SuperVector2 offsetControls(long double offsetX, long double offsetY) {
     SuperVector2 returnVal = {offsetX, offsetY};
     movingRightNow = false;
-    long double speed = 1.0L;
+    long double speed = 1.0L * 0.2 * sensitivity;
 
     if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
         returnVal.y = offsetY + speed;
@@ -190,7 +207,7 @@ SuperVector2 offsetControls(long double offsetX, long double offsetY) {
 ArbVector2 arbOffsetControls(mpf_class offsetX, mpf_class offsetY) {
     ArbVector2 returnVal = {offsetX, offsetY};
     movingRightNow = false;
-    mpf_class speed = 1.0;
+    mpf_class speed = 1.0 * 0.2 * sensitivity;
 
     if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
         returnVal.y = offsetY + speed;
@@ -469,9 +486,15 @@ int main(void) {
         }
 
         // MORE INFO display
-        Rectangle moreInfoBox = { 5 + moreInfoOffset, 5, 300, 400 };
+        Rectangle moreInfoBox;
+        if (showJuliaSet) {
+            moreInfoBox = { 5 + moreInfoOffset, 5, 300, 500 };
+        } else {
+            moreInfoBox = { 5 + moreInfoOffset, 5, 300, 370 };
+        }
         DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
         DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
+
 
         Rectangle collapseButton = {304 + moreInfoOffset, 15, 30, 50};
         DrawRectangleRec(collapseButton, Fade(BLACK, 0.8f));
@@ -492,7 +515,7 @@ int main(void) {
         drawPosition(usingArbitraryPrecisionLibrary, zoomFactor, offset, moreInfoOffset, arbOffset, arbZoomFactor);
 
         int lengthInput;
-        std::vector<bool*> allEditingStates = {&editingDetail, &editingZoomSpeed, &editingThreadCount, &editingSensitivity};
+        std::vector<bool*> allEditingStates = {&editingDetail, &editingZoomSpeed, &editingThreadCount, &editingSensitivity, &editingJuliaReal, &editingJuliaImag, &editingJuliaPower};
         
         drawTextInput(moreInfoOffset, 15, 100, 100, 30,
                 editingDetail, allEditingStates,
@@ -515,6 +538,25 @@ int main(void) {
         drawCheckbox(usingULDM, moreInfoOffset, 15, 275, 30, 30, "Ultra LDM", 5);
 
         drawCheckbox(usingWASD, moreInfoOffset, 15, 310, 30, 30, "Using WASD", 5);
+
+        drawCheckbox(showJuliaSet, moreInfoOffset, 15, 345, 30, 30, "Julia Set", 5);
+
+        if (showJuliaSet) {
+            drawTextInputDouble(moreInfoOffset, 15, 380, 100, 30,
+                    editingJuliaReal, allEditingStates,
+                    juliaRealInputText, "Re", needsRedraw,
+                    juliaReal);
+
+            drawTextInputDouble(moreInfoOffset, 15, 415, 100, 30,
+                    editingJuliaImag, allEditingStates,
+                    juliaImagInputText, "Im", needsRedraw,
+                    juliaImag);
+
+            drawTextInputDouble(moreInfoOffset, 15, 450, 100, 30,
+                    editingJuliaPower, allEditingStates,
+                    juliaPowerInputText, "Power", needsRedraw,
+                    juliaPower);
+        }
 
 
 
