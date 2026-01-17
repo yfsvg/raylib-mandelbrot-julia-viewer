@@ -40,6 +40,13 @@ void drawPosition(bool usingArbitraryPrecisionLibrary, long double zoomFactor, S
 
 
 
+void deselectAllTextInputs(std::vector<bool*> allEditingStates, bool* currentlyEditing) {
+    for (auto state : allEditingStates) {
+        *state = false;
+    }
+    *currentlyEditing = true;
+}
+
 void drawCheckbox(bool& variableToChange, float moreInfoOffset, float x, float y, float sizeX, float sizeY, std::string textWithBox, float margins) {
 
     Rectangle boxCheckbox = {x + moreInfoOffset, y, sizeX, sizeY};
@@ -56,7 +63,7 @@ void drawCheckbox(bool& variableToChange, float moreInfoOffset, float x, float y
 }
 
 void drawTextInput(float moreInfoOffset, float x, float y, float sizeX, float sizeY,
-                    bool& editingCurrentVariable, bool& editingOV1, bool& editingOV2,
+                    bool& editingCurrentVariable, std::vector<bool*> allEditingStates,
                     std::string& inputText, std::string queryText, bool& needsRedraw,
                     int& variableToChange
 ) {
@@ -70,9 +77,12 @@ void drawTextInput(float moreInfoOffset, float x, float y, float sizeX, float si
 
     if (CheckCollisionPointRec(GetMousePosition(), detailInputBox) &&
         IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        editingCurrentVariable = true;
-        editingOV1 = false;
-        editingOV2 = false;
+        deselectAllTextInputs(allEditingStates, &editingCurrentVariable);
+    }
+
+    if (editingCurrentVariable && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && 
+        !CheckCollisionPointRec(GetMousePosition(), detailInputBox)) {
+        editingCurrentVariable = false;
     }
 
     if (editingCurrentVariable) {
@@ -94,4 +104,13 @@ void drawTextInput(float moreInfoOffset, float x, float y, float sizeX, float si
             editingCurrentVariable = false;
         }
     }
+}
+
+void drawPopup(std::string bigText, std::string smallText, std::string acceptanceText) {
+    Rectangle bgBox = {0, 0, (float)GetScreenWidth(), (float)GetScreenHeight()};
+    DrawRectanglePro(bgBox, {0, 0}, 0, Fade(BLACK, 0.8f));
+
+    Rectangle moreInfoBox = { (float)(GetScreenWidth() / 2) - 150, (float)(GetScreenHeight() / 2) - 100, 300, 200 };
+    DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
+    DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
 }

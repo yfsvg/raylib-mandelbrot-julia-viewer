@@ -1,8 +1,3 @@
-// next implementing mouse dragging and scrolling functionality, as well as a delay to render a new screen so users have time to breathe
-// In between the time it takes for the user to breathe add a loading bar, same for as the rendering process.
-
-
-
 #include <math.h>
 #include <cstdlib>
 #include <complex>
@@ -54,11 +49,9 @@ std::string detailInputText = "250";
 bool editingZoomSpeed = false;
 long double zoomSpeed = 50;
 
-bool usingBoxZoom = false;
-
 int threadz = 4;
 bool editingThreadCount = false;
-char threadCountInputText[6] = "4";
+std::string threadCountInputText = "4";
 
 bool usingArbitraryPrecisionLibrary = false;
 
@@ -69,6 +62,13 @@ Vector2 dragEndPos = { 0, 0 };
 
 bool usingLDM = false;
 bool usingULDM = false;
+
+bool drawnLoading = false;
+bool needToAdjustZoom = false;
+
+int sensitivity = 5;
+std::string sensitivityInputText = "5";
+bool editingSensitivity = false;
 
 
 
@@ -93,7 +93,7 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
 
     // Draw the resulting colors to the texture
     BeginTextureMode(mandieSet);
-    ClearBackground(RAYWHITE);
+    ClearBackground(DARKGRAY);
 
     int addAmt = 1;
 
@@ -115,6 +115,7 @@ void renderMandelbrotToTexture(RenderTexture2D mandieSet, long double offsetX, l
 
     EndTextureMode();
 }
+
 
 // Rendering, arbitrary position library
 
@@ -261,7 +262,6 @@ int main(void) {
         else if (!usingArbitraryPrecisionLibrary && lastFrameWasArb) {
             offset.x = arbOffset.x.get_d();
             offset.y = arbOffset.y.get_d();
-            // i love getting d
             renderOffset.x = arbRenderOffset.x.get_d();
             renderOffset.y = arbRenderOffset.y.get_d();
             zoomFactor = arbZoomFactor.get_d();
@@ -270,6 +270,12 @@ int main(void) {
             needsRedraw = true;
         }
         lastFrameWasArb = usingArbitraryPrecisionLibrary;
+
+
+
+
+        // Movement
+
 
 
         if (canMove && usingWASD) {
@@ -291,11 +297,7 @@ int main(void) {
                 }
 
                  if (wasMovingLastFrame && !movingRightNow) {
-                    mpf_class zoomRatio = arbZoomFactor / previousArbZoom;
-                    arbOffset.x = arbOffset.x * zoomRatio;
-                    arbOffset.y = arbOffset.y * zoomRatio;
-                    previousArbZoom = arbZoomFactor;
-                    arbOldZoomFactor = arbZoomFactor;
+                    needToAdjustZoom = true;
                     needsRedraw = true;
                 }
 
@@ -316,13 +318,7 @@ int main(void) {
                 }
                 
                 if (wasMovingLastFrame && !movingRightNow) {
-                    if (fabsl(zoomFactor - previousZoom) > 0.01L) {
-                        long double zoomRatio = zoomFactor / previousZoom;
-                        offset.x = offset.x * zoomRatio;
-                        offset.y = offset.y * zoomRatio;
-                        previousZoom = zoomFactor;
-                    }
-                    oldZoomFactor = zoomFactor;
+                    needToAdjustZoom = true;
                     needsRedraw = true;
                 }
 
@@ -362,15 +358,12 @@ int main(void) {
             }
 
             if (wasMovingLastFrame && !movingRightNow) {
-                if (fabsl(zoomFactor - previousZoom) > 0.01L) {
-                    offset.x = offset.x * (zoomFactor / previousZoom);
-                    offset.y = offset.y * (zoomFactor / previousZoom);
-                    previousZoom = zoomFactor;
-                }
+                needToAdjustZoom = true;
+                
                 oldZoomFactor = zoomFactor;
-                // if the distance is too small, dont redraw and reset back to original
                 if (std::abs(dragStartPos.x - dragEndPos.x) < 3 && std::abs(dragStartPos.y - dragEndPos.y) < 3) {
                     offset = oldOffset;
+                    needToAdjustZoom = false; 
                 } else {
                     needsRedraw = true;
                 }
@@ -380,17 +373,47 @@ int main(void) {
 
         }
 
+
+
+
+        // Drawing
+
+
         if (needsRedraw && !movingRightNow) {
-            canMove = false;
-            if (usingArbitraryPrecisionLibrary) {
-                renderMandelbrotToTextureArbitraryPrecsion(mandelbrotTexture, arbOffset.x, arbOffset.y);
-                arbRenderOffset = arbOffset;
+            if (!drawnLoading) {
+                drawnLoading = true; 
             } else {
-                renderMandelbrotToTexture(mandelbrotTexture, offset.x, offset.y);
-                renderOffset = offset;
+                canMove = false;
+
+                if (needToAdjustZoom) {
+                    if (usingArbitraryPrecisionLibrary) {
+                        mpf_class zoomRatio = arbZoomFactor / previousArbZoom;
+                        arbOffset.x = arbOffset.x * zoomRatio;
+                        arbOffset.y = arbOffset.y * zoomRatio;
+                        previousArbZoom = arbZoomFactor;
+                        arbOldZoomFactor = arbZoomFactor;
+                    } else {
+                        if (fabsl(zoomFactor - previousZoom) > 0.01L) {
+                            offset.x = offset.x * (zoomFactor / previousZoom);
+                            offset.y = offset.y * (zoomFactor / previousZoom);
+                            previousZoom = zoomFactor;
+                        }
+                        oldZoomFactor = zoomFactor;
+                    }
+                    needToAdjustZoom = false;
+                }
+
+                if (usingArbitraryPrecisionLibrary) {
+                    renderMandelbrotToTextureArbitraryPrecsion(mandelbrotTexture, arbOffset.x, arbOffset.y);
+                    arbRenderOffset = arbOffset;
+                } else {
+                    renderMandelbrotToTexture(mandelbrotTexture, offset.x, offset.y);
+                    renderOffset = offset;
+                }
+                needsRedraw = false;
+                canMove = true;
+                drawnLoading = false; 
             }
-            needsRedraw = false;
-            canMove = true;
         }
         
         
@@ -404,7 +427,6 @@ int main(void) {
         if (usingArbitraryPrecisionLibrary) {
             mpf_class diffX = arbRenderOffset.x - arbOffset.x;
             mpf_class diffY = arbRenderOffset.y - arbOffset.y;
-            // Convert the difference (which is usually small relative to the screen) to double/float
             texX = (float)diffX.get_d();
             texY = (float)diffY.get_d();
         } else {
@@ -416,7 +438,7 @@ int main(void) {
         
         DrawTextureRec(mandelbrotTexture.texture, (Rectangle){0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height}, texturePos, WHITE);
         
-        if (movingRightNow) {
+        if (movingRightNow || drawnLoading) {
             long double scale;
             if (usingArbitraryPrecisionLibrary) {
                  mpf_class s = arbOldZoomFactor / arbZoomFactor;
@@ -425,11 +447,7 @@ int main(void) {
                  scale = oldZoomFactor / zoomFactor;
             }
 
-
-            if (usingBoxZoom) {
-                Rectangle outline = {.x = (float)((1 - scale) * GetScreenWidth() / 2), .y = (float)((1 - scale) * GetScreenHeight() / 2), .width = (float)(scale * GetScreenWidth()), .height = (float)(scale * GetScreenHeight())};
-            } else {               
-                // shrunked down scaled texture
+              
                 scale = 1 / scale;
                 Rectangle origMandie = {0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height};
                 Rectangle zoomChangeMandie = {
@@ -439,7 +457,6 @@ int main(void) {
                     (float)(mandelbrotTexture.texture.height * scale)
                 };
                 DrawTexturePro(mandelbrotTexture.texture, origMandie, zoomChangeMandie, (Vector2){0, 0}, 0.0f, WHITE);
-            }
         }
 
         if (IsKeyPressed(KEY_I)) {
@@ -475,21 +492,23 @@ int main(void) {
         drawPosition(usingArbitraryPrecisionLibrary, zoomFactor, offset, moreInfoOffset, arbOffset, arbZoomFactor);
 
         int lengthInput;
+        std::vector<bool*> allEditingStates = {&editingDetail, &editingZoomSpeed, &editingThreadCount, &editingSensitivity};
+        
         drawTextInput(moreInfoOffset, 15, 100, 100, 30,
-                editingDetail, editingZoomSpeed, editingThreadCount,
+                editingDetail, allEditingStates,
                 detailInputText, "Iterations", needsRedraw,
                 detailAmt);
 
-        // Zoom speed is fixed at 50 (no UI to change it)
-
         drawCheckbox(usingArbitraryPrecisionLibrary, moreInfoOffset, 15, 135, 30, 30, "Arbitrary Precision", 5);
 
-        drawCheckbox(usingBoxZoom, moreInfoOffset, 15, 170, 30, 30, "Use box zoom", 5);
+        drawTextInput(moreInfoOffset, 15, 170, 100, 30,
+                editingSensitivity, allEditingStates,
+                sensitivityInputText, "Sensitivity", needsRedraw,
+                sensitivity);
 
-        std::string fsdof = std::to_string(threadz);
         drawTextInput(moreInfoOffset, 15, 205, 100, 30,
-                editingThreadCount, editingDetail, editingZoomSpeed,
-                fsdof, "Threads", needsRedraw,
+                editingThreadCount, allEditingStates,
+                threadCountInputText, "Threads", needsRedraw,
                 threadz);
         
         drawCheckbox(usingLDM, moreInfoOffset, 15, 240, 30, 30, "Low Detail Mode", 5);
@@ -497,7 +516,14 @@ int main(void) {
 
         drawCheckbox(usingWASD, moreInfoOffset, 15, 310, 30, 30, "Using WASD", 5);
 
-        
+
+
+        if (drawnLoading == true) {
+            DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.3f));
+            DrawText("Getting Fractal Pixels", GetScreenWidth() / 2 - 100, GetScreenHeight() / 2 - 30, 20, RAYWHITE);
+            DrawRectangle(GetScreenWidth() / 2 - 100, GetScreenHeight() / 2, 200, 20, BLACK);
+            DrawRectangle(GetScreenWidth() / 2 - 95, GetScreenHeight() / 2 + 5, 190, 10, RAYWHITE);
+        }
 
         EndDrawing();
     }
