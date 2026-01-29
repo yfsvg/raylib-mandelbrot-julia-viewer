@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <link rel="stylesheet" href="realWebsite.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anonymous+Pro:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<section style="width: 100%;">
+    <div style="display: flex; align-items: center; gap:30px; margin-bottom: 15px;">
+        <h1 style="margin: 0px; color: white;">Raylib Mandelbrot/Julia Set Viewer</h1>
+    </div>
+
+    <p>Raylib viewer to see the Mandelbrot set and also the lesser known Julia set family. Very pretty fractals and stuff. The math is incredibly simple, in essence it just sees if a complex point diverges in a sequence and it makes this mess for some reason but it looks pretty. </p>
+</section>
+
+<div style="width: 100%; display: flex; gap: 30px; margin-bottom: 30px;">
+    <div class="container" id="cont1">
+        <h1>Web Viewer Information</h1>
+
+        <p class="importantText">If you don't at least skim through this section I'm gonna cry</p>
+        <br>
+
+        <p>Upon entering the visualizer, controls are automatically set to **using WASD to move the frame up and down and M to zoom in and N to zoom out**. If you unselect "Using WASD" you can use your mouse to drag around the screen. The frame will recalculate stuff and refresh when you stop moving.
+
+        <br><br>These sets are infinitely complex, but its not possible to show all of the detail at the same time. Change the number next to "Iterations" to increase the detail of the set, allowing you to see more interesting details. Moar iterations = moar detail and better zoom
+
+        <br><br>It can get slow when very zoomed in or using arbitrary position libraries. Change the amount of threads being used to increase performance, or use low detail mode or ultra low detail mode to increase pixel size and therefore reduce calculation and rendering time.</p>
+
+        <br><p class="importantText">Also read this!!</p>
+        <br><p>After zoom exceeds ##e+15, you start seeing precision issues because the regular viewer uses long double to hold position variables. There is an option to use an **arbitrary precision library** but it is not available in the website. Download from source.</p>
+    </div>
+
+    <div class="container" id="cont2" style="padding: 35px;">
+
+        <div style="height: 100%; width: 100%; border-radius: 10px; position: relative; background-image: url(/assets/preview.png); background-size: cover; cursor: pointer;">
+            <div style="width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center;">
+                <img src="/assets/playArrow.svg" style="width: 100px;">
+            </div>
+
+        </div>
+    </div>
+</div>
+    
+<div style="width: 100%; display: flex; gap: 30px;">
+    <div class="container">
+        <h1>What are they?</h1>
+
+        <p>The Mandelbrot set is a fractal given by the equation <code>z(n+1) = z(n)² + c</code> where z and c are both complex numbers. For each point c in the complex plane, the sequence begins at z = 0 and iterates, and that point is marked as black in the complex plane if it does not escape.</p>
+        <br>
+        <p>The Julia set is a fractal given by the equation <code>z(n+1) = z(n)² + c</code> where z and c are both complex numbers. For each point z in the complex plane, c is held constant and the sequence iterates from that initial z value, and that point is marked as black in the complex plane if it does not escape.</p>
+        <br> 
+        <p>Points that come really close to escaping are marked with bluer shades relative to all the other points rendered.</p>
+    </div>
+</div>
+
+</body>
+
+
+<footer style="margin-top: 100px;">
+    <p style="margin-bottom: 10px;">Made by yefoi</p>
+    <p style="margin-bottom: 10px;">Jan 2026</p>
+    <img src="/assets/Union.svg" style="height: 40px;">
+</footer>
+
+<script src="window.js"></script>
+
+
+</html>

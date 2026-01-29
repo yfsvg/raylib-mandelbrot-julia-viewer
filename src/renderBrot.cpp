@@ -350,9 +350,6 @@ int isInJuliaSetGMP(mpf_class zReal, mpf_class zImag, mpf_class cReal, mpf_class
     mpf_class z_r_sq, z_i_sq, temp;
     
     for (int i = 0; i < detailAmt; i++) {
-        // z = z^power + c
-        // For simplicity with GMP, we handle power = 2 as the standard case
-        // For other powers, we'd need more complex operations
         if (power == 2.0L) {
             z_r_sq = zReal * zReal;
             z_i_sq = zImag * zImag;
