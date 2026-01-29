@@ -167,3 +167,55 @@ void drawTextInputDouble(float moreInfoOffset, float x, float y, float sizeX, fl
         }
     }
 }
+
+void drawDividerLine(float moreInfoOffset, float y, std::string categoryName) {
+    Rectangle divider = {moreInfoOffset + 15, y, 280, 1};
+    DrawRectanglePro(divider, {0, 0}, 0, Fade(WHITE, 0.6f));
+    DrawText(categoryName.c_str(), moreInfoOffset + 15, y + 5, 15, Fade(WHITE, 0.6f));
+}
+
+
+
+void drawPopup(std::string bigText, std::string smallText, std::string acceptanceText, bool& popupDealtWithOrNah, bool& canMove)
+{
+
+    Rectangle popupBox = {
+        GetScreenWidth() / 2.0f - 250, GetScreenHeight() / 2.0f - 200, 500, 400
+    };
+
+    DrawRectangleRounded(popupBox, 0.05f, 8, Fade(BLACK, 0.85f));
+    DrawRectangleLinesEx(popupBox, 2, Fade(WHITE, 0.6f));
+
+    int titleFontSize = 30;
+    int titleWidth = MeasureText(bigText.c_str(), titleFontSize);
+
+    DrawText(bigText.c_str(), popupBox.x + popupBox.width / 2 - titleWidth / 2, popupBox.y + 30, titleFontSize, RAYWHITE);
+
+    int bodyFontSize = 20;
+
+    DrawText(smallText.c_str(), popupBox.x + 40, popupBox.y + 100, bodyFontSize, RAYWHITE);
+
+    int acceptFontSize = 18;
+    int acceptWidth = MeasureText(acceptanceText.c_str(), acceptFontSize);
+
+    Vector2 acceptPos = {popupBox.x + popupBox.width / 2 - acceptWidth / 2, popupBox.y + popupBox.height - 40};
+
+    Rectangle acceptRect = {
+        acceptPos.x,
+        acceptPos.y,
+        (float)acceptWidth,
+        (float)acceptFontSize
+    };
+
+    bool hovered = CheckCollisionPointRec(GetMousePosition(), acceptRect);
+
+    DrawText(acceptanceText.c_str(), acceptPos.x, acceptPos.y, acceptFontSize,
+        hovered ? YELLOW : Fade(RAYWHITE, 0.8f)
+    );
+
+    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || (hovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))) {
+        popupDealtWithOrNah = true;
+        canMove = true;
+    }
+
+}

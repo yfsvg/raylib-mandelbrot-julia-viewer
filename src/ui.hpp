@@ -26,6 +26,8 @@ void drawTextInputDouble(float moreInfoOffset, float x, float y, float sizeX, fl
                     long double& variableToChange
 );
 
-// void drawPopup(std::string bigText, std::string smallText, std::string acceptanceText);
+void drawPopup(std::string bigText, std::string smallText, std::string acceptanceText, bool& popupDealtWithOrNah, bool& canMove);
+
+void drawDividerLine(float moreInfoOffset, float y, std::string categoryName);
 
 #endif

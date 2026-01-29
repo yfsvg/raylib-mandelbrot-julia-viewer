@@ -1,3 +1,9 @@
+// Split UI into three segments:
+// 1. Math / formula changing
+// 2. Performance
+// 3. Viewing changes
+
+
 #include <math.h>
 #include <cstdlib>
 #include <complex>
@@ -83,12 +89,26 @@ std::string juliaRealInputText = "0.0";
 std::string juliaImagInputText = "0.0";
 std::string juliaPowerInputText = "2.0";
 
+bool popupDealtWithOrNah = true;
+std::string bigText;
+std::string smallText;
+std::string acceptanceText;
+
+bool manualRefresh = false;
+
 
 // rectangle zoom relocated to main
 
 void drawIntercepts(long double offsetX, long double offsetY) {
     DrawRectangle(GetScreenWidth() / 2 - 1 - (float)offsetX, 0, 2, GetScreenHeight(), RED);
     DrawRectangle(0, GetScreenHeight() / 2 - 1 - (float) offsetY, GetScreenWidth(), 2, RED);
+}
+
+mpf_class longDoubleToMpf(long double toTurn) {
+    std::stringstream ss;
+    ss << std::setprecision(35) << toTurn;
+    std::string e = ss.str();
+    return mpf_class(e);
 }
 
 std::vector<int> allEscapeValues;
@@ -146,7 +166,14 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
     allEscapeValues.clear();
     relativeEscapeValueColors.clear();
 
-    relativeEscapeValueColors = calculateEscapeValuesForArbs(mandieSet, offsetX, offsetY, threadz, arbZoomFactor, usingULDM, usingLDM, detailAmt);
+    if (showJuliaSet) {
+        mpf_class juliaSeedReal = longDoubleToMpf(juliaReal);
+        mpf_class juliaSeedImag = longDoubleToMpf(juliaImag);
+
+        relativeEscapeValueColors = calculateEscapeValuesJuliaArbs(mandieSet, offsetX, offsetY, threadz, arbZoomFactor, juliaSeedReal, juliaSeedImag, juliaPower, usingULDM, usingLDM, detailAmt);
+    } else {
+        relativeEscapeValueColors = calculateEscapeValuesForArbs(mandieSet, offsetX, offsetY, threadz, arbZoomFactor, usingULDM, usingLDM, detailAmt);
+    }
 
     BeginTextureMode(mandieSet);
     ClearBackground(RAYWHITE);
@@ -162,7 +189,7 @@ void renderMandelbrotToTextureArbitraryPrecsion(RenderTexture2D mandieSet, mpf_c
     int idx = 0;
     for (int x = 0; x < setWidth; x += addAmt) {
         for (int y = 0; y < setHeight; y += addAmt) {
-            if (idx < relativeEscapeValueColors.size()) {
+            if (idx < (int) relativeEscapeValueColors.size()) {
                 DrawRectangle(x, y, addAmt, addAmt, relativeEscapeValueColors[idx++]);
             }
         }
@@ -229,18 +256,10 @@ ArbVector2 arbOffsetControls(mpf_class offsetX, mpf_class offsetY) {
 }
 
 
-// It took me hours to figure out why there was an issue but apparently to_string has a precision limit too so this method works better
-mpf_class longDoubleToMpf(long double toTurn) {
-    std::stringstream ss;
-    ss << std::setprecision(35) << toTurn;
-    std::string e = ss.str();
-    return mpf_class(e);
-}
-
 // Main loop
 
 int main(void) {
-    mpf_set_default_prec(256);
+    mpf_set_default_prec(128);
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 600, "Mandelbrot");
@@ -258,6 +277,10 @@ int main(void) {
     
 
     while (!WindowShouldClose()) {
+        if (popupDealtWithOrNah == false) {
+            canMove = false;
+        }
+
         if (IsWindowResized()) {
             UnloadRenderTexture(mandelbrotTexture);
             mandelbrotTexture = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
@@ -309,13 +332,15 @@ int main(void) {
                     movingRightNow = true;
                 }
 
-                if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_N)) {
+                // FIXED: Only update oldZoomFactor if NOT manual refresh
+                if (!manualRefresh && (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_N))) {
                     arbOldZoomFactor = arbZoomFactor;
                 }
 
                  if (wasMovingLastFrame && !movingRightNow) {
                     needToAdjustZoom = true;
-                    needsRedraw = true;
+                    // FIXED: Only request redraw if NOT manual refresh
+                    if (!manualRefresh) needsRedraw = true;
                 }
 
             } else {
@@ -330,13 +355,15 @@ int main(void) {
                     movingRightNow = true;
                 }
 
-                if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_N)) {
+                // FIXED: Only update oldZoomFactor if NOT manual refresh
+                if (!manualRefresh && (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_N))) {
                     oldZoomFactor = zoomFactor;
                 }
                 
                 if (wasMovingLastFrame && !movingRightNow) {
                     needToAdjustZoom = true;
-                    needsRedraw = true;
+                    // FIXED: Only request redraw if NOT manual refresh
+                    if (!manualRefresh) needsRedraw = true;
                 }
 
             }
@@ -377,12 +404,14 @@ int main(void) {
             if (wasMovingLastFrame && !movingRightNow) {
                 needToAdjustZoom = true;
                 
-                oldZoomFactor = zoomFactor;
-                if (std::abs(dragStartPos.x - dragEndPos.x) < 3 && std::abs(dragStartPos.y - dragEndPos.y) < 3) {
-                    offset = oldOffset;
-                    needToAdjustZoom = false; 
-                } else {
-                    needsRedraw = true;
+                if (!manualRefresh) {
+                    oldZoomFactor = zoomFactor;
+                    if (std::abs(dragStartPos.x - dragEndPos.x) < 3 && std::abs(dragStartPos.y - dragEndPos.y) < 3) {
+                        offset = oldOffset;
+                        needToAdjustZoom = false; 
+                    } else {
+                        needsRedraw = true;
+                    }
                 }
                 
             }
@@ -396,7 +425,7 @@ int main(void) {
         // Drawing
 
 
-        if (needsRedraw && !movingRightNow) {
+        if ((needsRedraw && !movingRightNow && !manualRefresh) || (manualRefresh && (IsKeyPressed(KEY_R) ||IsKeyReleased(KEY_R)))) {
             if (!drawnLoading) {
                 drawnLoading = true; 
             } else {
@@ -426,6 +455,20 @@ int main(void) {
                 } else {
                     renderMandelbrotToTexture(mandelbrotTexture, offset.x, offset.y);
                     renderOffset = offset;
+
+                    if (zoomFactor >= 1e15L) {
+                        popupDealtWithOrNah = false;
+                        bigText = "Warning: Precision Limit";
+                        smallText = "You've reached the precision limit of long\ndouble! Bugs start appearing once you\nstart further zooming in.\n\nIf you're on the web viewer, then this is it. \nHowever, if you download raylib and run it\nfrom there, you can go even deeper with\nthearbitrary preicion library";
+                        acceptanceText = "I understand";
+                    }
+
+                    if (zoomFactor < 10L) {
+                        popupDealtWithOrNah = false;
+                        bigText = "hey";
+                        smallText = "theres nothing out here bud zoom back in";
+                        acceptanceText = "ok lol";
+                    }
                 }
                 needsRedraw = false;
                 canMove = true;
@@ -436,26 +479,46 @@ int main(void) {
         
         wasMovingLastFrame = movingRightNow;
 
+
+
+
+
+
+
+
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
 
+
+
+
+
         float texX, texY;
+        bool zoomMismatch = false;
+
         if (usingArbitraryPrecisionLibrary) {
             mpf_class diffX = arbRenderOffset.x - arbOffset.x;
             mpf_class diffY = arbRenderOffset.y - arbOffset.y;
             texX = (float)diffX.get_d();
             texY = (float)diffY.get_d();
+            
+            // Check if actual zoom differs from the rendered texture zoom
+            zoomMismatch = (arbZoomFactor != arbOldZoomFactor);
+
         } else {
             texX = (float)(renderOffset.x - offset.x);
             texY = (float)(renderOffset.y - offset.y);
+            
+            // Check if actual zoom differs from the rendered texture zoom
+            zoomMismatch = (zoomFactor != oldZoomFactor);
         }
 
         Vector2 texturePos = { texX, texY };
         
         DrawTextureRec(mandelbrotTexture.texture, (Rectangle){0, 0, (float)mandelbrotTexture.texture.width, (float)-mandelbrotTexture.texture.height}, texturePos, WHITE);
         
-        if (movingRightNow || drawnLoading) {
+        if (movingRightNow || drawnLoading || (manualRefresh && zoomMismatch)) {
             long double scale;
             if (usingArbitraryPrecisionLibrary) {
                  mpf_class s = arbOldZoomFactor / arbZoomFactor;
@@ -488,9 +551,9 @@ int main(void) {
         // MORE INFO display
         Rectangle moreInfoBox;
         if (showJuliaSet) {
-            moreInfoBox = { 5 + moreInfoOffset, 5, 300, 500 };
+            moreInfoBox = { 5 + moreInfoOffset, 5, 300, 620 };
         } else {
-            moreInfoBox = { 5 + moreInfoOffset, 5, 300, 370 };
+            moreInfoBox = { 5 + moreInfoOffset, 5, 300, 500 };
         }
         DrawRectangleRounded(moreInfoBox, 0.00f, 4, Fade(BLACK, 0.8f));
         DrawRectangleLinesEx(moreInfoBox, 1, Fade(WHITE, 0.5f));
@@ -514,50 +577,66 @@ int main(void) {
         
         drawPosition(usingArbitraryPrecisionLibrary, zoomFactor, offset, moreInfoOffset, arbOffset, arbZoomFactor);
 
+        drawDividerLine(moreInfoOffset, 100, "Viewing Settings");
+
         int lengthInput;
         std::vector<bool*> allEditingStates = {&editingDetail, &editingZoomSpeed, &editingThreadCount, &editingSensitivity, &editingJuliaReal, &editingJuliaImag, &editingJuliaPower};
         
-        drawTextInput(moreInfoOffset, 15, 100, 100, 30,
+        drawTextInput(moreInfoOffset, 15, 125, 100, 30,
                 editingDetail, allEditingStates,
                 detailInputText, "Iterations", needsRedraw,
                 detailAmt);
 
-        drawCheckbox(usingArbitraryPrecisionLibrary, moreInfoOffset, 15, 135, 30, 30, "Arbitrary Precision", 5);
+        drawCheckbox(usingArbitraryPrecisionLibrary, moreInfoOffset, 15, 160, 30, 30, "Arbitrary Precision", 5);
 
-        drawTextInput(moreInfoOffset, 15, 170, 100, 30,
+        drawCheckbox(usingWASD, moreInfoOffset, 15, 195, 30, 30, "Using WASD", 5);
+
+        drawTextInput(moreInfoOffset, 15, 230, 100, 30,
                 editingSensitivity, allEditingStates,
                 sensitivityInputText, "Sensitivity", needsRedraw,
                 sensitivity);
 
-        drawTextInput(moreInfoOffset, 15, 205, 100, 30,
+
+            
+        drawDividerLine(moreInfoOffset, 270, "Performance");
+
+        drawTextInput(moreInfoOffset, 15, 295, 100, 30,
                 editingThreadCount, allEditingStates,
                 threadCountInputText, "Threads", needsRedraw,
                 threadz);
         
-        drawCheckbox(usingLDM, moreInfoOffset, 15, 240, 30, 30, "Low Detail Mode", 5);
-        drawCheckbox(usingULDM, moreInfoOffset, 15, 275, 30, 30, "Ultra LDM", 5);
+        drawCheckbox(usingLDM, moreInfoOffset, 15, 330, 30, 30, "Low Detail Mode", 5);
+        drawCheckbox(usingULDM, moreInfoOffset, 15, 365, 30, 30, "Ultra LDM", 5);
+        drawCheckbox(manualRefresh, moreInfoOffset, 15, 400, 30, 30, "Manual Refresh (R)", 5);
 
-        drawCheckbox(usingWASD, moreInfoOffset, 15, 310, 30, 30, "Using WASD", 5);
 
-        drawCheckbox(showJuliaSet, moreInfoOffset, 15, 345, 30, 30, "Julia Set", 5);
+
+
+                    
+        drawDividerLine(moreInfoOffset, 440, "Julia Set Viewing");
+
+        drawCheckbox(showJuliaSet, moreInfoOffset, 15, 465, 30, 30, "Turn on Julia Set", 5);
 
         if (showJuliaSet) {
-            drawTextInputDouble(moreInfoOffset, 15, 380, 100, 30,
+            drawTextInputDouble(moreInfoOffset, 15, 500, 100, 30,
                     editingJuliaReal, allEditingStates,
                     juliaRealInputText, "Re", needsRedraw,
                     juliaReal);
 
-            drawTextInputDouble(moreInfoOffset, 15, 415, 100, 30,
+            drawTextInputDouble(moreInfoOffset, 15, 535, 100, 30,
                     editingJuliaImag, allEditingStates,
                     juliaImagInputText, "Im", needsRedraw,
                     juliaImag);
 
-            drawTextInputDouble(moreInfoOffset, 15, 450, 100, 30,
+            drawTextInputDouble(moreInfoOffset, 15, 570, 100, 30,
                     editingJuliaPower, allEditingStates,
                     juliaPowerInputText, "Power", needsRedraw,
                     juliaPower);
         }
 
+        if (popupDealtWithOrNah == false) {
+            drawPopup(bigText, smallText, acceptanceText, popupDealtWithOrNah, canMove);
+        }
 
 
         if (drawnLoading == true) {
