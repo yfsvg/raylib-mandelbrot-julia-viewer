@@ -1,6 +1,8 @@
-## Super important read right now
+## 2 things you HAVE to know RIGHT NOW
+1. If you are using the web viewer, PLEASE be patient and wait for the initial image to generate please please! wasm is far slower than native c++ so be patient thank you <3
+2. You will enter "movement mode" once you start pressing WASD or M/N for zooming in. The MOMENT you release all of the keys, frames are going to start rendering and you won't be able to move.
 
-After zoom exceeds ##e+15, you start seeing precision issues because the regular viewer uses long double to hold position variables. There is an option to use an **arbitrary precision library** but it is not available in the website because I dont feel like setting up gmp in emscripten actually it might be possible stay tuned i mgiht add it.
+
 
 ***
 
@@ -13,6 +15,10 @@ Raylib viewer to see the Mandelbrot set and also the lesser known Julia set fami
 # How to access
 
 There is a website that I will be pasting a link to in here very soon. In the meantime it is also possible to download it directly together with raylib, which is the better option if you want to use the arbitrary position library.
+
+# Arbitrary precision
+
+After zoom exceeds ##e+15, you start seeing precision issues because the regular viewer uses long double to hold position variables. There is an option to use an **arbitrary precision library** but it is not available in the website because I dont feel like setting up gmp in emscripten actually it might be possible stay tuned i mgiht add it.
 
 ## How to use
 
