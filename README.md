@@ -1,4 +1,4 @@
-## 2 things you HAVE to know RIGHT NOW
+### 2 things you HAVE to know RIGHT NOW RAHHH IF YOU ONLY HAVE THE PATIENCE TO READ ONE SECTION IT BETTER BE THIS ONE
 1. If you are using the web viewer, PLEASE be patient and wait for the initial image to generate please please! wasm is far slower than native c++ so be patient thank you <3
 2. You will enter "movement mode" once you start pressing WASD or M/N for zooming in. The MOMENT you release all of the keys, frames are going to start rendering and you won't be able to move.
 
